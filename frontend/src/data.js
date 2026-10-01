@@ -33,7 +33,8 @@ export const REWARDS = [
  {id:'r1',t:'$2 off',cost:200,min:5,val:2},
  {id:'r2',t:'Free kopi',cost:150,min:3,val:1.7},
  {id:'r3',t:'$5 off',cost:500,min:10,val:5}];
-const U = (id,n,pts,org) => ({id,n,pts,org,in:org?1:0,items:[],sub:0,paid:0,paidAmt:0,rw:null,dirty:0,earned:0,left:0,hist:[]});
+// pmeth = payment method the person selected (nothing is charged yet). paid/paidAmt/paidMeth are only set when the organiser sends the order.
+const U = (id,n,pts,org) => ({id,n,pts,org,in:org?1:0,items:[],sub:0,paid:0,paidAmt:0,paidMeth:'',pmeth:null,rw:null,dirty:0,earned:0,left:0,hist:[]});
 export const USERS0 = [U(0,'Alex',340,1),U(1,'Ben',260),U(2,'Calvin',90),U(3,'Dylan',520),U(4,'Eve',150),
  U(5,'Farah',410),U(6,'Gareth',75),U(7,'Hui Min',230),U(8,'Irfan',600),U(9,'Jia Wei',180)];
 // Demo "card on file" per person, purely cosmetic for the prototype.
@@ -56,6 +57,21 @@ export const SAVED0 = [
  {name:'Marketing Team',members:['Ben','Calvin','Dylan']},
  {name:'Friday Breakfast Crew',members:['Ben','Dylan','Eve']},
  {name:'Project Team',members:['Calvin','Eve']}];
+// Previous group orders. Each entry keeps the date/time, outlet, pickup slot and EVERY submitted member's own items,
+// so each person sees "what I ordered" and the organiser sees "who got what".
+// TODO(backend): GET /group-orders/history (participants only receive their own order).
+const ho = (items, rw='') => { const owed = items.reduce((s,i)=>s+i.p*i.q,0); return {items, owed, rw, earn: Math.floor(owed*10)}; };
+const it = (id,name,o,q,p) => ({id,name,o,q,p});
+const tot = orders => Object.values(orders).reduce((s,o)=>s+o.owed,0);
+const O1 = {
+ 0: ho([it(1,'Kaya Toast Set','Kopi O, less sweet',1,5.2)]),
+ 1: ho([it(2,'French Toast Set','Teh',1,5.6),it(6,'Kopi','Normal, hot',1,1.7)]),
+ 3: ho([it(1,'Kaya Toast Set','Kopi',1,5.2),it(4,'Butter Kaya Toast','As served',1,2.4)])};
+const O2 = {
+ 0: ho([it(2,'French Toast Set','Teh',1,5.6),it(8,'Milo','Normal, iced',1,3.0)]),
+ 1: ho([it(1,'Kaya Toast Set','Kopi O',1,5.2)]),
+ 2: ho([it(3,'Peanut Butter Toast Set','Teh O, kosong',1,5.2)]),
+ 3: ho([it(1,'Kaya Toast Set','Kopi',2,5.2)])};
 export const HIST0 = [
- {id:'YT0987',name:'Friday Breakfast Crew',date:'Fri 19 Sep',total:31.4,members:['Alex','Ben','Dylan'],mine:[{id:1,name:'Kaya Toast Set',o:'Kopi O, less sweet',q:1,p:5.2}]},
- {id:'YT0951',name:'Marketing Team',date:'Tue 9 Sep',total:42.5,members:['Alex','Ben','Calvin','Dylan'],mine:[{id:2,name:'French Toast Set',o:'Teh',q:1,p:5.6},{id:8,name:'Milo',o:'Normal, iced',q:1,p:3.0}]}];
+ {id:'YT0987',name:'Friday Breakfast Crew',at:new Date(2026,8,18,8,20).getTime(),outlet:'Ya Kun – Far East Square',slot:'8:45 AM',coll:'C-017',status:'collected',pay:'individual',members:['Alex','Ben','Dylan'],orders:O1,total:tot(O1)},
+ {id:'YT0951',name:'Marketing Team',at:new Date(2026,8,8,8,35).getTime(),outlet:'Ya Kun – NTU North Spine',slot:'9:00 AM',coll:'C-029',status:'collected',pay:'individual',members:['Alex','Ben','Calvin','Dylan'],orders:O2,total:tot(O2)}];

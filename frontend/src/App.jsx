@@ -7,6 +7,11 @@ import './styles.css';
 // Open the gear button (top right of the phone) to switch between organiser and participant views and to trigger error states.
 
 const pts10 = v => Math.floor(v*10);
+// Payment methods a person can pick. Picking one does NOT charge anything; the charge happens when the organiser sends the order.
+const METHODS = ['card','apple','paynow'];
+const mName = (id,u) => id==='apple'?'Apple Pay':id==='paynow'?'PayNow':'Card ending '+CARD_LAST4[u];
+const STAT = {preparing:'Being prepared',ready:'Ready for collection',collected:'Collected'};
+const fdt = ms => new Date(ms).toLocaleDateString([],{weekday:'short',day:'numeric',month:'short',year:'numeric'})+' · '+tm(ms);
 const IC={
  back:<path d="M15 5l-7 7 7 7"/>, chev:<path d="M9 5l7 7-7 7"/>,
  home:<><path d="M3 11l9-8 9 8"/><path d="M5 9.5V21h14V9.5"/></>,
@@ -57,9 +62,10 @@ const itemLine = i => i.name + (optTxt(i.o) ? ' (' + optTxt(i.o) + ')' : '') + (
 const lines = p => p.items.map(itemLine).join(' + ');
 // "Still choosing" only fits someone who already has items; a person who was just added has not started yet.
 const waitText = p => p.items.length ? 'Still choosing' : 'Not ordered yet';
-const blank = p => ({...p,items:[],sub:0,paid:0,paidAmt:0,rw:null,dirty:0,earned:0,left:0,in:p.org?1:0});
-const G0 = {name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failNext:false,sold:[],slotGone:false};
-const freshG = () => ({...G0, slotTimes: makeSlotTimes()});
+const blank = p => ({...p,items:[],sub:0,paid:0,paidAmt:0,paidMeth:'',pmeth:null,rw:null,dirty:0,earned:0,left:0,in:p.org?1:0});
+const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failNext:false,sold:[],slotGone:false};
+// n = how many group orders this session has already finished, so every new group gets its own order id and collection number.
+const freshG = (n=0) => ({...G0, gid:'YT'+(1024+n), coll:'C-'+String(42+n).padStart(3,'0'), slotTimes: makeSlotTimes()});
 
 function App(){
  const [scr,setScr]=useState('login');
@@ -75,49 +81,70 @@ function App(){
  const [notes,setNotes]=useState([]);
  const [toast,setToast]=useState('');
  const [saved,setSaved]=useState(SAVED0);
- const [hist]=useState(HIST0);
+ const [hist,setHist]=useState(HIST0);
  const [ren,setRen]=useState(null);
  const [err,setErr]=useState('');
  const [open,setOpen]=useState(null);
  const [pm,setPm]=useState('me');
- const meth = 'Card ending '+CARD_LAST4[uid];
+ const [sel,setSel]=useState('card');
  const [receipt,setReceipt]=useState(null);
  const [step,setStep]=useState(1);
- const [banner,setBanner]=useState(null);
- const bannerT=useRef(null);
+ const [banners,setBanners]=useState([]);
+ const nid=useRef(0), toastT=useRef(null), Pr=useRef(null);
 
  const isOrg=uid===0, me=P[uid], org=P[0];
  const outlet={n:OUTLET_CAPS[g.oi].n,w:OUTLET_CAPS[g.oi].w,slots:Object.fromEntries(g.slotTimes.map((t,i)=>[t,OUTLET_CAPS[g.oi].caps[i]]))};
  const slotValid=!!g.slot&&outlet.slots[g.slot]>=g.size&&!g.slotGone;
- const members=P.filter(p=>p.in), subm=members.filter(p=>p.sub), unpaid=subm.filter(p=>!p.paid);
+ Pr.current=P;
+ const members=P.filter(p=>p.in), subm=members.filter(p=>p.sub);
  const rw=p=>REWARDS.find(r=>r.id===p.rw);
  const owed=p=>Math.max(0,sum(p.items)-(rw(p)?rw(p).val:0));
  const groupTotal=subm.reduce((s,p)=>s+owed(p),0);
+ // Nobody is charged until the order is sent. "Ready to pay" just means a payment method has been chosen.
+ const needsMethod=p=>g.pay==='individual'&&p.sub&&owed(p)>0&&!p.pmeth;
+ const unpaid=subm.filter(needsMethod);
  const slotOk=t=>outlet.slots[t]>=g.size&&!(g.slotGone&&t===g.slot&&g.sent===false&&g.live);
  const bad=p=>p.items.filter(i=>g.sold.includes(i.id));
  const editable=g.live&&me.in&&!g.closed&&!g.sent;
  const payReady=g.pay==='sponsor'||unpaid.length===0;
- const everyone=members.length>0&&members.every(p=>p.sub&&(g.pay==='sponsor'||p.paid));
+ const everyone=members.length>0&&members.every(p=>p.sub&&!needsMethod(p));
  const canSend=g.closed&&!g.sent&&subm.length>0&&payReady&&slotValid;
- const why=!g.closed?'Close ordering first.':subm.length===0?'No orders have been submitted.':!payReady?unpaid.length+' payment(s) still outstanding.':!slotValid?'Choose a pickup time that fits your group size.':'';
+ const why=!g.closed?'Close ordering first.':subm.length===0?'No orders have been submitted.':!payReady?unpaid.length+' payment method(s) still to be chosen.':!slotValid?'Choose a pickup time that fits your group size.':'';
  const statusText=g.cancelled?'Cancelled':g.sent?(g.status==='collected'?'Collected':g.status==='ready'?'Ready for collection':'Being prepared'):g.closed?'Ordering closed':'Ordering open';
  const invState=g.sent||g.cancelled||g.inv==='expired'?'expired':(g.inv==='full'||members.length>=g.size)?'full':'valid';
  const GATED=['group','cart','track','done','pay','paid'];
  const screen=!me.in&&GATED.includes(scr)?'gate':scr;
  const TAB={gate:'order',join:'order',home:'home',create:'home',menu:'order',cart:'order',group:'order',track:'order',done:'order',wallet:'pay',pay:'pay',paid:'pay',rewards:'rewards',more:'more',repeat:'more',notifs:'more'};
  const tab=TAB[screen];
+ // Notifications belong to specific people. Each one lists who receives it, and "seen" is tracked per person.
+ const myNotes=notes.filter(x=>x.to.includes(uid));
+ const hasNew=myNotes.some(x=>!x.seen.includes(uid));
+ const markSeen=()=>setNotes(a=>a.map(x=>x.to.includes(uid)&&!x.seen.includes(uid)?{...x,seen:[...x.seen,uid]}:x));
+ const banner=[...banners].reverse().find(b=>b.to.includes(uid));
+ const mem=()=>Pr.current.filter(p=>p.in).map(p=>p.id);
+ const meth=mName(me.pmeth||'card',uid);
+ // Order history: the current group appears as soon as it is sent (so it is never lost), older ones are archived below it.
+ const snapshot=()=>({s:1,id:g.gid,name:g.name,at:g.sentAt||Date.now(),outlet:outlet.n,slot:g.slot,coll:g.coll,status:g.status||'preparing',pay:g.pay,total:groupTotal,
+  members:subm.map(p=>p.n),
+  orders:Object.fromEntries(subm.map(p=>[p.id,{items:p.items.map(i=>({...i})),owed:owed(p),rw:rw(p)?rw(p).t:'',earn:g.status==='collected'?p.earned:pts10(owed(p))}]))});
+ const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist];
+ const myHist=histAll.filter(h=>h.orders[uid]||(uid===0&&h.members.includes(USERS0[0].n)));
 
- const say=(t,mid,ms)=>{setToast({t,mid:!!mid});setTimeout(()=>setToast(''),ms||(mid?2500:2400))};
+ const say=(t,mid,ms)=>{clearTimeout(toastT.current);setToast({t,mid:!!mid});toastT.current=setTimeout(()=>setToast(''),ms||(mid?2500:2400))};
  const login=()=>{
   // TODO(backend): POST /auth/cherish {identifier,password} -> token + user. Never keep real passwords client-side.
   const acc=ACCOUNTS.find(a=>a.identifier.toLowerCase()===idf.trim().toLowerCase());
   if(!acc||acc.password!==pwd){setLoginErr('Incorrect email, mobile number or password.');return}
   setLoginErr('');setUid(acc.id);setScr('home');
  };
- const note=(t,i='bell')=>{setNotes(n=>[{t,i,new:1},...n]);clearTimeout(bannerT.current);setBanner({t,i});bannerT.current=setTimeout(()=>setBanner(null),4200)};
+ // note(text, icon, to): `to` = the user ids who receive it (default: everyone currently in the group).
+ const note=(t,i='bell',to)=>{
+  const rec=[...new Set(to||mem())], id=++nid.current;
+  setNotes(a=>[{id,t,i,to:rec,seen:[]},...a]);
+  setBanners(b=>[...b,{id,t,i,to:rec}]);setTimeout(()=>setBanners(b=>b.filter(x=>x.id!==id)),4200);
+ };
  const upd=(id,f)=>setP(p=>p.map(x=>x.id===id?{...x,...(typeof f==='function'?f(x):f)}:x));
- const staleIfChanged=(x,items,rwId)=>{const r=REWARDS.find(rr=>rr.id===rwId),newOwed=Math.max(0,sum(items)-(r?r.val:0));return x.paid&&Math.abs((x.paidAmt||0)-newOwed)>0.001?{paid:0,paidAmt:0}:{}};
- const setItems=f=>upd(uid,x=>{const it=f(x.items),r=REWARDS.find(r=>r.id===x.rw),drop=r&&sum(it)<r.min,newRw=drop?null:x.rw;return {items:it,rw:newRw,dirty:x.sub?1:0,...staleIfChanged(x,it,newRw)}});
+ const setItems=f=>upd(uid,x=>{const it=f(x.items),r=REWARDS.find(r=>r.id===x.rw),drop=r&&sum(it)<r.min,newRw=drop?null:x.rw;return {items:it,rw:newRw,dirty:x.sub?1:0}});
  const setSize=n=>{if(n>MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`,1,1500);n=MAXSIZE}setG(x=>({...x,size:Math.max(2,n)}))};
  const setOutlet=i=>setG(x=>{const idx=x.slotTimes.indexOf(x.slot),ok=idx>=0&&OUTLET_CAPS[i].caps[idx]>=x.size;return {...x,oi:i,slot:ok?x.slot:''}});
 
@@ -126,7 +153,7 @@ function App(){
   // TODO(backend): the server owns the deadline. It closes ordering, consolidates orders and sends reminders/push notifications; the client only displays the countdown.
   if(!g.live||g.closed||g.sent||g.cancelled)return;
   const msLeft=g.deadlineAt-Date.now(), timers=[];
-  if(!g.reminded&&msLeft>0)timers.push(setTimeout(()=>{setG(x=>x.reminded||x.closed||x.sent||x.cancelled?x:{...x,reminded:true});note('2 minutes left to submit your order','clock');say('2 minutes left to order')},Math.max(0,msLeft-120000)));
+  if(!g.reminded&&msLeft>0)timers.push(setTimeout(()=>{setG(x=>x.reminded||x.closed||x.sent||x.cancelled?x:{...x,reminded:true});const rec=Pr.current.filter(p=>p.in&&!p.sub).map(p=>p.id);if(rec.length){note('2 minutes left to submit your order','clock',rec);if(rec.includes(uid))say('2 minutes left to order')}},Math.max(0,msLeft-120000)));
   timers.push(setTimeout(()=>{setG(x=>x.closed||x.sent||x.cancelled?x:{...x,closed:true,expired:true});note('Ordering closed: time is up','clock');if(uid===0)setSheet({k:'expired'})},Math.max(0,msLeft)));
   return ()=>timers.forEach(clearTimeout);
  },[g.deadlineAt,g.live,g.closed,g.sent,g.cancelled,g.reminded,uid]);
@@ -135,16 +162,27 @@ function App(){
   const at=Date.now()+g.win*60000;
   setG(x=>({...x,live:true,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
   setP(p=>p.map(x=>[1,2,3].includes(x.id)?{...x,in:1}:x));
-  note('Invitations sent for '+g.name,'mail');note('Reminder set: ordering closes at '+tm(at),'clock');
+  note('Invitations sent for '+g.name,'mail',[0]);note(org.n+' invited you to '+g.name,'mail',[1,2,3]);
+  note('Reminder set: ordering closes at '+tm(at),'clock',[0,1,2,3]); // only the people in this group
   setStep(4);say('Group created');
+ };
+ // A group order that is open or still being collected is never overwritten. A collected one is archived into the order history first.
+ const begin=name=>{
+  if(g.live&&!g.cancelled&&!(g.sent&&g.status==='collected')){
+   say(g.sent?'Your current group order is still in progress':'Finish or cancel your current group order first',1,2000);setScr(g.sent?'done':'group');return;
+  }
+  const arch=g.live&&g.sent&&!g.cancelled;
+  if(arch)setHist(h=>[snapshot(),...h]);
+  const n=hist.filter(h=>h.s).length+(arch?1:0);
+  setG({...freshG(n),...(name?{name}:{})});
+  setP(p=>p.map(x=>({...blank(USERS0[x.id]),pts:x.pts,hist:x.hist})));
+  setStep(1);setScr('create');
  };
  const startFrom=s=>{
   // TODO(backend): GET /saved-groups/:id and POST /groups with the saved members invited again.
-  setStep(1);setG({...freshG(),name:s.name});setP(p=>p.map(x=>({...blank(USERS0[x.id]),pts:x.pts})));setScr('create');
+  begin(s.name);
  };
- const newOrder=()=>{
-  setG(freshG());setP(p=>p.map(x=>({...blank(USERS0[x.id]),pts:x.pts})));setStep(1);setScr('create');
- };
+ const newOrder=()=>begin();
  const cancelOrder=()=>{
   // TODO(backend): POST /groups/:id/cancel (invalidates the invite link, removes orders, notifies members).
   setG(x=>({...x,cancelled:true,closed:true}));note('Group order cancelled','alert');setSheet(null);say('Group order cancelled');
@@ -155,7 +193,7 @@ function App(){
  };
  const leave=()=>{
   // TODO(backend): POST /groups/:id/leave (removes the participant's order and notifies the organiser).
-  upd(uid,{in:0,left:1,sub:0,items:[],paid:0,paidAmt:0,rw:null});note(me.n+' left the group','door');setScr('group');
+  upd(uid,{in:0,left:1,sub:0,items:[],paid:0,paidAmt:0,rw:null});note(me.n+' left the group','door',[0]);setScr('group');
  };
  const removeP=p=>{
   // TODO(backend): DELETE /groups/:id/participants/:userId (organiser only, before final submit).
@@ -164,7 +202,7 @@ function App(){
  const addP=p=>{
   // TODO(backend): POST /groups/:id/invitations {userId} (organiser only). Server checks group size, sends the push notification and returns the updated member list.
   if(members.length>=g.size){say('Group is full ('+members.length+'/'+g.size+')',1);return}
-  upd(p.id,{in:1,left:0});note(p.n+' was added to '+g.name,'users');
+  upd(p.id,{in:1,left:0});note(p.n+' was added to '+g.name,'users',[...mem(),p.id]);
   if(members.length+1>=g.size)say(p.n+' added. Group is now full ('+(members.length+1)+'/'+g.size+')'+(g.size>=MAXSIZE?', the maximum':''),1);else say(p.n+' added to the group');
  };
  const extend=()=>{
@@ -185,40 +223,56 @@ function App(){
  // (a server, Firebase/Supabase, or at minimum a BroadcastChannel between tabs of ONE browser) and the app must read the group id/token from the URL.
  const copyLink=()=>{
   // TODO(backend): use the invite URL returned by POST /groups (expires when the order completes or is cancelled).
-  try{navigator.clipboard.writeText('https://yakun.app/together/YT1024').catch(()=>{})}catch(e){}
+  try{navigator.clipboard.writeText('https://yakun.app/together/'+g.gid).catch(()=>{})}catch(e){}
   setSheet({k:'invite'});
  };
  const remind=(p,type)=>{
   // TODO(backend): POST /groups/:id/remind {userId,type} -> push notification
-  note('Reminder sent to '+p.n+': '+type,'clock');say('Reminder sent to '+p.n);
+  note('Reminder sent to '+p.n+': '+type,'clock',[uid]); // confirmation for the organiser only
+  note(org.n+' sent you a reminder: '+type,'clock',[p.id]); // the reminder itself goes to that one person
+  say('Reminder sent to '+p.n);
  };
  const addToCart=()=>{
   // TODO(backend): check item availability at the selected outlet (error state: item unavailable).
   const s=sheet,iced=s.temp.startsWith('Iced'),extra=(s.m.set||s.m.dr)&&iced?0.6:0;
   const o=s.m.set?`${s.drink}${s.sw!=='Normal'?', '+s.sw.toLowerCase():''}${iced?', iced':''}`:s.m.dr?`${s.sw}${iced?', iced':', hot'}`:'As served';
   setItems(c=>{const i=c.findIndex(x=>x.id===s.m.id&&x.o===o);if(i>=0)return c.map((x,k)=>k===i?{...x,q:x.q+s.q}:x);return [...c,{id:s.m.id,name:s.m.name,o,q:s.q,p:s.m.price+extra}]});
-  setSheet(null);say('Added to your order');
+  setSheet(null);say('Added to your order',1,1500);
  };
  const submit=()=>{
   // TODO(backend): PUT /groups/:id/orders/me (own order only). Server rejects after deadline/close and re-validates prices, availability and reward.
   if(g.closed)return say('Ordering is closed');
   if(bad(me).length)return say('Remove unavailable items first');
   const first=!me.sub;
-  upd(uid,{sub:1,dirty:0,paid:g.pay==='sponsor'?1:me.paid});
-  note(me.n+(first?' submitted':' updated')+' an order','check');
-  if(first&&g.pay==='individual'&&owed(me)>0){setPm('me');setScr('pay')}
+  upd(uid,{sub:1,dirty:0}); // nothing is paid here; the charge happens when the organiser sends the order
+  if(uid!==0)note(me.n+(first?' submitted':' updated')+' an order','check',[0]);
+  if(first&&g.pay==='individual'&&owed(me)>0&&!me.pmeth){goPay('me')}
   else{setScr('track');say(first?'Order submitted':'Order updated')}
  };
- const send=()=>{
+ const send=(o={})=>{
   // TODO(backend): POST /groups/:id/send -> consolidates orders, sends ONE order to the outlet, locks outlet/time, notifies the group.
   // This is also the moment the order can no longer change, so it's when any applied Cherish reward's points cost is actually spent.
-  setG(x=>({...x,sent:true,status:'preparing'}));
+  // Payment methods chosen earlier are charged now, and only now.
+  const sponsor=g.pay==='sponsor', at=Date.now();
+  const amtOf=x=>sponsor?(x.org?groupTotal:0):owed(x);
+  const methOf=x=>x.org&&o.meth?o.meth:(x.pmeth||'card');
+  setG(x=>({...x,sent:true,sentAt:at,status:'preparing'}));
   setP(p=>p.map(x=>{
    if(!(x.in&&x.sub))return x;
-   const r=rw(x);
-   return r?{...x,paid:1,pts:x.pts-r.cost,hist:[{amt:-r.cost,note:r.t+' reward',at:Date.now()},...x.hist]}:{...x,paid:1};
+   const r=rw(x), amt=amtOf(x), base={...x,paid:1,paidAmt:amt,paidMeth:amt>0?mName(methOf(x),x.id):'',pmeth:x.pmeth||(amt>0?methOf(x):null)};
+   return r?{...base,pts:x.pts-r.cost,hist:[{amt:-r.cost,note:r.t+' reward',at}, ...x.hist]}:base;
   }));
   note('Group order submitted. Collect at '+g.slot+', '+outlet.n,'receipt');
+  subm.forEach(x=>{const amt=amtOf(x);note(amt>0?'You were charged '+$(amt)+' ('+mName(methOf(x),x.id)+') for '+g.name:sponsor?org.n+' paid for your order. Nothing to pay.':'Nothing was charged: your order was fully covered.','card',[x.id])});
+ };
+ // Organiser taps "Send": if a charge would be declined (demo switch), the order is NOT sent and that person is asked for another method.
+ const trySend=()=>{
+  if(g.failNext){
+   const v=subm.find(p=>!p.org&&owed(p)>0&&p.pmeth)||subm.find(p=>owed(p)>0&&p.pmeth);
+   setG(x=>({...x,failNext:false}));
+   if(v){upd(v.id,{pmeth:null});note('Your payment was declined. Choose another payment method so the order can be sent.','alert',[v.id]);note('Payment declined for '+v.n+'. The order was not sent.','alert',[0]);say('Payment declined for '+v.n+'. Order not sent.',1,2200);return false}
+  }
+  send();return true;
  };
  const markCollected=()=>{
   // TODO(backend): POST /groups/:id/collected -> the organiser confirms handover. Credits each submitted member's earned Cherish points and writes a history entry, since the purchase is now complete.
@@ -228,27 +282,28 @@ function App(){
    const earn=pts10(owed(x));
    return {...x,earned:earn,pts:x.pts+earn,hist:[{amt:earn,note:'Ya Kun Together · '+g.name,at:Date.now()},...x.hist]};
   }));
-  note('Order collected. Cherish points have been credited.','check');
+  subm.forEach(x=>note('Order collected. '+pts10(owed(x))+' Cherish points credited.','check',[x.id]));
  };
  const doPay=()=>{
-  // TODO(backend): POST /payments using the existing Ya Kun payment flow. This should be an AUTHORISATION (a hold), not an immediate
-  // charge: the real money only moves when the organiser sends the group order to the outlet (see `send`, called below for sponsor pay).
-  // If a participant edits their order after authorising, `setItems`/`setReward` below invalidate the old authorisation so they must
-  // pay the new amount — the server should void the stale hold the same way. Organiser only sees paid/unpaid, never card details.
-  const amt=pm==='group'?groupTotal:owed(me);
-  const items=pm==='group'?subm.flatMap(p=>p.items):me.items;
-  if(g.failNext){setG(x=>({...x,failNext:false}));setErr('Payment failed. The payment was declined. Try another method or try again.');return}
-  setErr('');setReceipt({amt,group:pm==='group',at:Date.now(),items});
-  if(pm==='group')send();else{upd(uid,{paid:1,paidAmt:amt});note('Payment authorised for '+me.n,'card')}
-  setScr('paid');
+  // TODO(backend): store the chosen payment method only (no charge). The server captures the money when the organiser sends the group order
+  // (see `send`). Organiser only sees "payment ready" vs "not ready", never card details.
+  if(pm==='group'){
+   // Organiser paying for everyone: the charge happens as the order is sent.
+   if(g.failNext){setG(x=>({...x,failNext:false}));setErr('Payment failed. The payment was declined. Try another method or try again.');return}
+   setErr('');setReceipt({amt:groupTotal,at:Date.now(),items:subm.flatMap(p=>p.items),meth:mName(sel,uid)});
+   upd(uid,{pmeth:sel});send({meth:sel});setScr('paid');return;
+  }
+  upd(uid,{pmeth:sel});
+  setScr('track');say('Payment method saved. You will only be charged when the order is sent.');
  };
+ const goPay=mode=>{setPm(mode);setSel(me.pmeth||'card');setErr('');setScr('pay')};
  const othersDone=()=>{
   // DEMO ONLY: real participants act through their own devices.
   const who=members.filter(x=>!x.org&&!x.sub&&DEMO_ORDERS[x.id]);
   if(g.closed||who.length===0)return say(g.closed?'Ordering is closed':'Everyone has already submitted');
-  setP(p=>p.map(x=>who.some(w=>w.id===x.id)?{...x,items:DEMO_ORDERS[x.id],sub:1,paid:x.id===3?0:1}:x));
-  note(who.length+' participant'+(who.length===1?'':'s')+' submitted their orders','check');
-  const late=who.some(w=>w.id===3);say(who.map(w=>w.n).join(', ')+(late?' submitted. Dylan still needs to pay.':' submitted and paid.'));
+  setP(p=>p.map(x=>who.some(w=>w.id===x.id)?{...x,items:DEMO_ORDERS[x.id],sub:1,pmeth:x.id===3?null:'card'}:x));
+  note(who.length+' participant'+(who.length===1?'':'s')+' submitted their orders','check',[0]);
+  const late=who.some(w=>w.id===3);say(who.map(w=>w.n).join(', ')+(late?' submitted. Dylan still needs to choose a payment method.':' submitted.'));
  };
  const advance=()=>{
   // DEMO ONLY: the outlet updates status; TODO(backend): GET /groups/:id/status (preparing/ready) + push notification.
@@ -256,8 +311,10 @@ function App(){
   if(g.status==='preparing'){setG(x=>({...x,status:'ready'}));note('Your group order is ready for collection','star')}else say('Already ready');
  };
  const reorder=h=>{
+  const m=h.orders[uid];
   if(!editable)return say('Join or start an open group first');
-  setItems(()=>h.mine.map(i=>({...i})));setSheet(null);setScr('cart');say('Previous order loaded. Change anything you like.');
+  if(!m)return say("You didn't order in that group");
+  setItems(()=>m.items.map(i=>({...i})));setSheet(null);setScr('cart');say('Previous order loaded. Change anything you like.');
  };
 
  const tot={};subm.forEach(p=>p.items.forEach(i=>{const t=tot[i.name]||(tot[i.name]={q:0,v:{}});t.q+=i.q;t.v[i.o]=(t.v[i.o]||0)+i.q}));
@@ -265,7 +322,7 @@ function App(){
  const back={join:'home',create:'home',pay:'wallet',paid:'track',repeat:'more',notifs:'more'};
  const goBack=()=>{if(screen==='create'&&step>1&&step<4)setStep(step-1);else setScr(back[screen])};
  const expiredBtns=<div className="col"><button className="btn" onClick={extend}>Add 15 more minutes</button><button className="btn ghost" disabled={subm.length===0} onClick={()=>{setSheet(null);setG(x=>({...x,expired:false}));setScr('track')}}>Continue with {subm.length} order{subm.length===1?'':'s'}</button><button className="link danger" onClick={()=>setSheet({k:'cancel'})}>Cancel group order</button></div>;
- const pstat=p=>g.pay==='sponsor'?<Tag c="ok">Organiser pays</Tag>:p.sub&&p.paid&&!p.dirty?<Tag c="ok">Paid</Tag>:p.sub?<Tag c="w">Payment needed</Tag>:<Tag>–</Tag>;
+ const pstat=p=>g.pay==='sponsor'?<Tag c="ok">Organiser pays</Tag>:g.sent&&p.sub&&p.paid?<Tag c="ok">Paid</Tag>:!p.sub?<Tag>–</Tag>:owed(p)===0?<Tag c="ok">Nothing to pay</Tag>:p.pmeth?<Tag c="ok">Payment ready</Tag>:<Tag c="w">Payment method needed</Tag>;
 
  if(scr==='login')return <div className="phone"><div className="splash">
   <div className="logo">Ya Kun</div><div style={{fontSize:18,fontWeight:700,marginBottom:6}}>Log in with Ya Kun Cherish</div>
@@ -284,7 +341,7 @@ function App(){
  return <div className="phone">
   <Clock/>
   <div className="bar">{back[screen]&&<button onClick={goBack} aria-label="Back"><Icon n="back" s={24}/></button>}<h1>{T[screen]}</h1>
-   <button aria-label="Notifications" onClick={()=>{setNotes(n=>n.map(x=>({...x,new:0})));setScr('notifs')}}><Icon n="bell"/>{notes.some(n=>n.new)&&<i className="dot"/>}</button>
+   <button aria-label="Notifications" onClick={()=>{markSeen();setScr('notifs')}}><Icon n="bell"/>{hasNew&&<i className="dot"/>}</button>
    <button className="me" aria-label="Switch demo user" onClick={()=>setSheet({k:'demo'})}>{me.n}</button></div>
   <div className="body">
   {tab==='order'&&<div className="seg">{[['menu','Menu'],['cart','My order'],['group','Group'],['track','Status']].map(([k,l])=><button key={k} className={(scr===k||(k==='track'&&scr==='done'))?'on':''} onClick={()=>setScr(k==='track'&&g.sent?'done':k)}>{l}{k==='cart'&&me.items.length>0&&<i className="badge">{me.items.length}</i>}</button>)}</div>}
@@ -293,9 +350,9 @@ function App(){
   {tab==='order'&&isOrg&&g.expired&&!g.sent&&!g.cancelled&&<div className="card"><b>Time is up</b><div className="mute" style={{margin:'6px 0 14px'}}>{subm.length} of {members.length} people submitted.</div>{expiredBtns}</div>}
 
   {screen==='home'&&<>
-   {isOrg&&<div className="hero"><h2>Breakfast for the whole team, one order.</h2><p className="mute" style={{marginBottom:14}}>Everyone picks their own food, pays their own way and earns their own Cherish points.</p><button className="btn" onClick={()=>g.live&&!g.sent&&!g.cancelled?setScr('group'):newOrder()}>{g.live&&!g.sent&&!g.cancelled?'Open my group order':'Start Ya Kun Together'}</button></div>}
+   {isOrg&&<div className="hero"><h2>Breakfast for the whole team, one order.</h2><p className="mute" style={{marginBottom:14}}>Everyone picks their own food, pays their own way and earns their own Cherish points.</p>{(()=>{const active=g.live&&!g.cancelled&&!(g.sent&&g.status==='collected');return <button className="btn" onClick={()=>active?setScr(g.sent?'done':'group'):newOrder()}>{active?(g.sent?'View my group order':'Open my group order'):'Start Ya Kun Together'}</button>})()}</div>}
    <div className="card row"><div className="av"><Icon n="star"/></div><div className="sp"><b>Cherish account</b><div className="mute">{me.n} · linked</div></div><div className="big" style={{fontSize:26}}>{me.pts}</div></div>
-   {g.live&&me.in?<div className="card click" onClick={()=>setScr('group')} style={{borderColor:'var(--red)'}}><b>{g.name}</b><div className="mute">{statusText}{!g.closed&&!g.sent&&!g.cancelled&&<ClosesIn target={g.deadlineAt}/>}</div></div>
+   {g.live&&me.in?<div className="card click" onClick={()=>setScr(g.sent?'done':'group')} style={{borderColor:'var(--red)'}}><b>{g.name}</b><div className="mute">{statusText}{!g.closed&&!g.sent&&!g.cancelled&&<ClosesIn target={g.deadlineAt}/>}</div></div>
     :g.live&&!g.cancelled?<div className="card click" onClick={()=>setScr('join')} style={{borderColor:'var(--red)'}}><b>{org.n} invited you to {g.name}</b><div className="mute">Tap to view the invitation</div></div>
     :!isOrg&&<div className="card mute">No active group order right now. You can still browse the menu and your rewards, and join as soon as you get an invitation link.</div>}
    <button className="btn ghost" style={{marginBottom:12}} onClick={()=>setScr('menu')}>Browse the menu</button>
@@ -334,7 +391,7 @@ function App(){
    </>}
    {step===4&&<>
     <div className="hero" style={{textAlign:'center'}}><Icon n="check" s={44}/><h2 style={{marginTop:10}}>Your group is ready</h2><div className="mute">{g.name}<br/>Pickup {g.slot} · ordering closes {g.deadline}</div></div>
-    <div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/YT1024</div><button className="btn sm" onClick={copyLink}>Copy link</button></div>
+    <div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div><button className="btn sm" onClick={copyLink}>Copy link</button></div>
     <div className="mute">Share the link so friends can join.</div>
     <div className="sticky"><button className="btn" onClick={()=>setScr('menu')}>Begin my order</button><button className="btn ghost" style={{marginTop:10}} onClick={()=>setScr('group')}>View group</button></div>
    </>}
@@ -361,7 +418,7 @@ function App(){
    <div className="card"><div className="row"><b className="sp">{g.name}</b><Tag c={g.sent?'ok':g.closed?'':'w'}>{statusText}</Tag></div>
     <div className="mute" style={{margin:'6px 0'}}>Organiser: {org.n} · Deadline {g.deadline}{isOrg&&' · '+subm.length+'/'+members.length+' submitted'}</div>
     <div className="mute"><Icon n="pin" s={14}/> {outlet.n}<br/><Icon n="clock" s={14}/> Collect at {g.slot}{g.sent&&' (locked)'}<br/><Icon n="card" s={14}/> {g.pay==='sponsor'?org.n+' is paying for everyone':'Everyone pays for their own order'}</div></div>
-   {isOrg&&!g.sent&&<div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/YT1024</div>{/* TODO(backend): use the invite URL returned by POST /groups. It expires when the order completes or is cancelled. */}<button className="btn sm" onClick={copyLink}>Copy link</button></div>}
+   {isOrg&&!g.sent&&<div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div>{/* TODO(backend): use the invite URL returned by POST /groups. It expires when the order completes or is cancelled. */}<button className="btn sm" onClick={copyLink}>Copy link</button></div>}
    <div className="h3">Members ({members.length}/{g.size})</div>
    {members.map(p=><div className={'card row'+(p.id===uid?' mine':'')} key={p.id}><div className="av">{p.n[0]}</div><div className="sp"><b>{p.n}{p.org?' (organiser)':''}</b>{isOrg&&<div className="mute">{p.sub?'Order submitted':g.closed?'Missed deadline':waitText(p)}</div>}</div>
     {isOrg&&!p.org&&!g.sent&&<button className="btn sm ghost" onClick={()=>setSheet({k:'confirm',title:'Remove '+p.n+'?',msg:`${p.n}'s order will be cleared and they will need a new invite to rejoin.`,label:'Remove',action:()=>{removeP(p);setSheet(null)}})}>Remove</button>}</div>)}
@@ -391,34 +448,36 @@ function App(){
    {!!me.sub&&!me.dirty&&!g.closed&&<Ban c="k">Submitted. You can edit until {g.deadline}.</Ban>}
    {!!me.dirty&&<Ban>You changed your order. Update it so the group sees the latest version.</Ban>}
    <div className="mute" style={{marginBottom:8}}>Only you can change these items. Each one shows under your name in the group order.</div>
-   {me.items.length===0&&<div className="card"><div className="mute">Your order is empty. Browse the menu to add items.</div><button className="btn ghost sm" style={{marginTop:10}} onClick={()=>reorder(hist[0])}>Reorder my last order</button></div>}
+   {me.items.length===0&&<div className="card"><div className="mute">Your order is empty. Browse the menu to add items.</div><button className="btn ghost sm" style={{marginTop:10}} disabled={!myHist.length} onClick={()=>reorder(myHist[0])}>Reorder my last order</button></div>}
    {me.items.map((c,i)=><div className="card" key={i}><div className="row"><div className="sp"><b>{c.name}</b>{optTxt(c.o)&&<div className="mute">{optTxt(c.o)}</div>}</div>
     <div className="qty"><button disabled={!editable} onClick={()=>setItems(x=>x.map((y,k)=>k===i?{...y,q:y.q-1}:y).filter(y=>y.q>0))}>−</button><b>{c.q}</b><button disabled={!editable} onClick={()=>setItems(x=>x.map((y,k)=>k===i?{...y,q:y.q+1}:y))}>+</button></div><b style={{width:56,textAlign:'right'}}>{$(c.p*c.q)}</b></div>
     {g.sold.includes(c.id)&&<div style={{color:'var(--red)',fontWeight:700,fontSize:13,marginTop:6}}>Unavailable at this outlet. Remove it to continue.</div>}</div>)}
    {me.items.length>0&&<>
     <div className="card"><div className="row"><b className="sp">Cherish reward</b><span className="mute">{me.pts} points</span></div>
-     {rw(me)?<div className="opt on" style={{margin:'10px 0 0'}}><b>{rw(me).t} applied</b><div className="mute">Uses {rw(me).cost} points from your account, taken when the group order is collected.</div>{editable&&<button className="link" onClick={()=>upd(uid,x=>({rw:null,...staleIfChanged(x,x.items,null)}))}>Remove reward</button>}</div>
+     {rw(me)?<div className="opt on" style={{margin:'10px 0 0'}}><b>{rw(me).t} applied</b><div className="mute">Uses {rw(me).cost} points from your account, taken when the group order is sent.</div>{editable&&<button className="link" onClick={()=>upd(uid,{rw:null})}>Remove reward</button>}</div>
      :<button className="btn ghost sm" style={{marginTop:10}} disabled={!editable} onClick={()=>setSheet({k:'rewards'})}>View eligible rewards</button>}</div>
     <div className="card"><div className="row"><span className="sp">Subtotal</span>{$(sum(me.items))}</div>
      {rw(me)&&<div className="row voucher"><span className="sp">{rw(me).t}</span>−{$(sum(me.items)-owed(me))}</div>}
      <div className="row" style={{marginTop:6}}><b className="sp">{g.pay==='sponsor'?org.n+' is paying for you':'You pay'}</b><b>{g.pay==='sponsor'?$(0):$(owed(me))}</b></div>
      <div className="mute" style={{marginTop:8}}>You'll earn about <b>{pts10(owed(me))} Cherish points</b> when the group order is collected.</div></div>
-    {!!me.sub&&!me.dirty&&g.pay==='individual'&&(me.paid?<Ban c="k">Paid {$(me.paidAmt)}</Ban>:me.paidAmt>0?<><Ban c="w">Your order total changed. Your earlier payment of {$(me.paidAmt)} no longer covers it — please pay again.</Ban><button className="btn" style={{marginTop:10}} onClick={()=>{setPm('me');setScr('pay')}}>Pay {$(owed(me))}</button></>:<button className="btn" style={{marginTop:10}} onClick={()=>{setPm('me');setScr('pay')}}>Pay {$(owed(me))}</button>)}
+    {!!me.sub&&g.pay==='individual'&&owed(me)>0&&!g.sent&&(me.pmeth?<><Ban c="k">Payment method: {mName(me.pmeth,uid)}. You will be charged {$(owed(me))} only when the organiser sends the group order.</Ban><button className="link" onClick={()=>goPay('me')}>Change payment method</button></>:<button className="btn" style={{marginTop:10}} onClick={()=>goPay('me')}>Choose payment method</button>)}
+    {g.sent&&!!me.paid&&me.paidAmt>0&&<Ban c="k">Charged {$(me.paidAmt)} to {me.paidMeth}</Ban>}
     {editable&&<div className="sticky"><button className="btn" disabled={bad(me).length>0} onClick={submit}>{me.sub?'Update my order':'Submit my order'}</button></div>}
    </>}
   </>}
 
   {screen==='pay'&&<>
-   <div className="hero" style={{textAlign:'center'}}><div className="mute">{pm==='group'?'Group total':'Amount payable'}</div><div className="big">{$(pm==='group'?groupTotal:owed(me))}</div>{pm==='group'&&<div className="mute">One payment covers everyone's order.</div>}<div className="mute" style={{marginTop:6}}>{pm==='group'?'Everyone earns points on their own items. You will earn about ':'You will earn about '}<b>{pts10(owed(me))} Cherish points</b> when the group order is collected.</div></div>
+   <div className="hero" style={{textAlign:'center'}}><div className="mute">{pm==='group'?'Group total':'You will pay when the order is sent'}</div><div className="big">{$(pm==='group'?groupTotal:owed(me))}</div>{pm==='group'&&<div className="mute">One payment covers everyone's order.</div>}<div className="mute" style={{marginTop:6}}>{pm==='group'?'Everyone earns points on their own items. You will earn about ':'You will earn about '}<b>{pts10(owed(me))} Cherish points</b> when the group order is collected.</div></div>
    {err&&<Ban c="e">{err}</Ban>}
-   <div className="opt on"><b>{meth}</b><div className="mute">Default payment method</div></div>
-   <div className="mute" style={{margin:'6px 0 12px'}}>This authorises the amount now. The payment is only captured when {pm==='group'?'you send':'the organiser sends'} the group order to the outlet. Others only see paid or unpaid, never your payment details.</div>
-   <button className="btn" onClick={()=>err?doPay():setSheet({k:'confirmPay'})}>{err?'Try again':'Review and pay '+$(pm==='group'?groupTotal:owed(me))}</button>
+   <label className="l" style={{marginTop:0}}>Payment method</label>
+   {METHODS.map(k=><div key={k} className={'opt '+(sel===k?'on':'')} onClick={()=>setSel(k)}><b>{mName(k,uid)}</b>{k==='card'&&<div className="mute">Default payment method</div>}</div>)}
+   <div className="mute" style={{margin:'6px 0 12px'}}>{pm==='group'?'The group total is charged when you send the order to the outlet. Others only see paid or unpaid, never your payment details.':'Nothing is charged now. Your payment method is only charged when the organiser sends the group order to the outlet, and you will get a notification then. Others only see whether your payment is ready, never your payment details.'}</div>
+   <button className="btn" onClick={()=>pm==='group'?(err?doPay():setSheet({k:'confirmPay'})):doPay()}>{pm==='group'?(err?'Try again':'Review and pay '+$(groupTotal)):'Confirm payment method'}</button>
   </>}
 
   {screen==='paid'&&receipt&&<>
-   <div className="hero" style={{textAlign:'center'}}><div style={{fontSize:44}}><Icon n="check" s={44}/></div><h2>Payment confirmed</h2><div className="big">{$(receipt.amt)}</div><div className="mute">Ref PAY-{receipt.group?'G':'P'}{String(receipt.amt*100|0).padStart(5,'0')} · {meth}</div></div>
-   <button className="btn" onClick={()=>setScr(receipt.group?'done':'track')}>{receipt.group?'View group order':'View group status'}</button>
+   <div className="hero" style={{textAlign:'center'}}><div style={{fontSize:44}}><Icon n="check" s={44}/></div><h2>Payment confirmed</h2><div className="big">{$(receipt.amt)}</div><div className="mute">Ref PAY-G{String(receipt.amt*100|0).padStart(5,'0')} · {receipt.meth}</div></div>
+   <button className="btn" onClick={()=>setScr('done')}>View group order</button>
   </>}
 
   {screen==='track'&&(!g.live?<div className="card mute">No group order yet.</div>:<>
@@ -428,24 +487,24 @@ function App(){
    {!isOrg&&<div className="card"><div className="row"><b className="sp">My order</b>{me.sub?<Tag c="ok">Submitted</Tag>:<Tag c={g.closed?'':'w'}>{g.closed?'Missed deadline':'Not submitted'}</Tag>}</div>
     <div className="mute" style={{margin:'6px 0'}}>{me.items.length?lines(me):'No items yet.'}</div>
     <div className="row"><span className="sp mute">Payment</span>{pstat(me)}</div>
-    {!!me.sub&&g.pay==='individual'&&!me.paid&&!g.sent&&<button className="btn sm" style={{marginTop:10}} onClick={()=>{setPm('me');setScr('pay')}}>Pay {$(owed(me))}</button>}</div>}
+    {needsMethod(me)&&!g.sent&&<button className="btn sm" style={{marginTop:10}} onClick={()=>goPay('me')}>Choose payment method</button>}</div>}
    {isOrg&&<>
     <div className="card"><div className="mute">Total group order</div><div className="big">{$(groupTotal)}</div><div className="mute">{members.length} joined · {subm.length} submitted · {members.length-subm.length} not submitted</div></div>
     <div className="h3">People ({members.length})</div>
      {members.map(p=><div className={'card click'+(p.id===uid?' mine':'')} key={p.id} onClick={()=>setOpen(open===p.id?null:p.id)}>
       <div className="row"><div className="av">{p.n[0]}</div><div className="sp"><b>{p.n}{p.org?' (organiser)':''}</b><div className="mute">{p.sub?$(owed(p))+' · '+(n=>n+' item'+(n===1?'':'s'))(p.items.reduce((s,i)=>s+i.q,0)):g.closed?'Missed the deadline':waitText(p)}</div></div><Icon n="chev" s={16}/></div>
       <div className="row" style={{marginTop:12,flexWrap:'wrap'}}>{p.sub?<Tag c="ok">Submitted</Tag>:g.closed?<Tag c="w">Missed</Tag>:<Tag>{p.items.length?'Ordering':'Not ordered yet'}</Tag>}{pstat(p)}<span className="sp"/>
-       {p.id!==uid&&!g.closed&&!p.sub&&!p.org&&<button className="link" onClick={e=>{e.stopPropagation();remind(p,'order before '+g.deadline)}}>Remind</button>}{p.id!==uid&&g.pay==='individual'&&p.sub&&!p.paid&&<button className="link" onClick={e=>{e.stopPropagation();remind(p,'payment due')}}>Remind</button>}</div>
+       {p.id!==uid&&!g.closed&&!p.sub&&!p.org&&<button className="link" onClick={e=>{e.stopPropagation();remind(p,'order before '+g.deadline)}}>Remind</button>}{p.id!==uid&&!g.sent&&needsMethod(p)&&<button className="link" onClick={e=>{e.stopPropagation();remind(p,'choose a payment method before the order is sent')}}>Remind</button>}</div>
       {open===p.id&&<div className="expand">{p.items.length?p.items.map((i,k)=><div className="row" key={k}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}</span>× {i.q}</div>):<div className="mute">No items yet</div>}<div className="mute" style={{marginTop:6}}>View only</div></div>}</div>)}
    </>}
    {g.sent?<button className="btn" onClick={()=>setScr('done')}>View collection details</button>:isOrg&&<>
     {!g.closed&&<button className="btn ghost" style={{marginBottom:10}} onClick={()=>setSheet({k:'confirm',title:'Close ordering now?',msg:"Nobody will be able to submit or change an order after this, even if the deadline hasn't passed.",label:'Close ordering',action:()=>{closeEarly();setSheet(null)}})}>Close ordering early</button>}
-    <button className="btn" disabled={!canSend} onClick={()=>{if(g.pay==='sponsor'){setPm('group');setScr('pay')}else{send();setScr('done')}}}>{g.pay==='sponsor'?'Pay '+$(groupTotal)+' and send to outlet':'Send group order to outlet'}</button>
+    <button className="btn" disabled={!canSend} onClick={()=>{if(g.pay==='sponsor'){goPay('group')}else if(trySend())setScr('done')}}>{g.pay==='sponsor'?'Pay '+$(groupTotal)+' and send to outlet':'Send group order to outlet'}</button>
     {!canSend&&<div className="mute" style={{marginTop:8}}>{why}</div>}</>}
   </>)}
 
   {screen==='done'&&(!g.sent?<div className="card mute">The group order hasn't been sent to the outlet yet.</div>:<>
-   <div className="hero" style={{textAlign:'center'}}><div className="mute">Group order</div><div className="big">#YT1024</div><div className="mute">Collection number <b>C-042</b><br/>{outlet.n} · {g.slot} · about {outlet.w} preparation</div></div>
+   <div className="hero" style={{textAlign:'center'}}><div className="mute">Group order</div><div className="big">#{g.gid}</div><div className="mute">Collection number <b>{g.coll}</b><br/>{outlet.n} · {g.slot} · about {outlet.w} preparation</div></div>
    {g.status==='ready'&&<Ban c="k">{isOrg?'Ready to collect. Tap below once you have it.':'The group order is ready. '+org.n+' will collect it.'}</Ban>}
    {g.status==='collected'&&<Ban c="k">Collected — Cherish points have been credited to everyone who submitted.</Ban>}
    <div className="card"><div className="tl">
@@ -462,8 +521,10 @@ function App(){
     <div className="card">{subm.map(p=><div key={p.id} style={{padding:'8px 0'}}><b>{p.n}</b>{p.items.map((i,k)=><div className="mute" key={k}>{itemLine(i)}</div>)}</div>)}</div>
    </>:<div className="card"><b>My items</b>{me.items.length?me.items.map((i,k)=><div className="mute" key={k}>{itemLine(i)}</div>):<div className="mute">No items</div>}</div>}
    <div className="h3">Cherish points</div>
-   <div className="card">{subm.filter(p=>isOrg||p.id===uid).map(p=><div className="row" key={p.id} style={{padding:'4px 0'}}><span className="sp">{p.n}</span>{g.status==='collected'?<b style={{color:'var(--ok)'}}>+{p.earned} points</b>:<span className="mute">Pending collection</span>}</div>)}<div className="mute" style={{marginTop:6}}>Points are credited once the organiser marks the order collected.</div></div>
+   <div className="card">{subm.filter(p=>isOrg||p.id===uid).map(p=><div className="row" key={p.id} style={{padding:'4px 0'}}><span className="sp">{p.n}</span><b style={{color:'var(--ok)'}}>+{g.status==='collected'?p.earned:pts10(owed(p))} points</b></div>)}<div className="mute" style={{marginTop:6}}>{g.status==='collected'?'These points have been added to each account.':'Points shown are what each person will get. They are credited once the organiser marks the order collected.'}</div></div>
    {isOrg&&<button className="btn ghost" onClick={saveGroup}>Save this group</button>}
+   {isOrg&&g.status==='collected'&&<button className="btn" style={{marginTop:12}} onClick={newOrder}>Start a new group order</button>}
+   <button className="btn ghost" style={{marginTop:12}} onClick={()=>setScr('repeat')}>View order history</button>
   </>)}
 
   {screen==='repeat'&&<>
@@ -471,26 +532,32 @@ function App(){
    {saved.map((s,i)=><div className="card" key={i}><div className="row">{ren===i?<input autoFocus defaultValue={s.name} onBlur={e=>{const v=e.target.value.trim();setSaved(a=>a.map((x,k)=>k===i&&v?{...x,name:v}:x));setRen(null)}}/>:<b className="sp">{s.name}</b>}{ren!==i&&<button className="link" onClick={()=>setRen(i)}>Rename</button>}</div>
     <div className="mute">{s.members.join(', ')}</div><button className="btn sm" style={{marginTop:10}} disabled={!isOrg} onClick={()=>startFrom(s)}>Start new order</button></div>)}
    <div className="h3">Previous group orders</div>
-   {hist.map(h=><div className="card" key={h.id}><div className="row"><b className="sp">{h.name}</b><span className="mute">{h.date}</span></div><div className="mute">#{h.id} · {$(h.total)} · {h.members.join(', ')}</div>
-    <div className="row" style={{marginTop:10}}><button className="btn sm ghost" onClick={()=>setSheet({k:'hist',h})}>My order</button><button className="btn sm" disabled={!isOrg} onClick={()=>startFrom({name:h.name})}>Reuse group</button></div></div>)}
+   {myHist.length===0&&<div className="card mute">No previous group orders yet. Your team orders will be listed here with the date, time and what you ordered.</div>}
+   {myHist.map(h=>{const m=h.orders[uid];return <div className="card" key={h.id}>
+    <div className="row"><b className="sp">{h.name}</b><Tag c={h.status==='collected'?'ok':'w'}>{STAT[h.status]}</Tag></div>
+    <div className="mute" style={{marginTop:4}}><Icon n="clock" s={14}/> {fdt(h.at)}</div>
+    <div className="mute"><Icon n="pin" s={14}/> {h.outlet} · pickup {h.slot}</div>
+    <div className="mute">#{h.id} · {h.members.join(', ')}</div>
+    <div className="expand">{m?<><b>What you ordered</b>{m.items.map((i,k)=><div className="row" key={k}><span className="sp">{itemLine(i)}</span>{$(i.p*i.q)}</div>)}</>:<div className="mute">You didn't submit an order in this group.</div>}</div>
+    <div className="row" style={{marginTop:10}}><button className="btn sm ghost" onClick={()=>setSheet({k:'hist',h})}>Details</button><button className="btn sm" disabled={!isOrg} onClick={()=>startFrom({name:h.name})}>Reuse group</button></div></div>})}
   </>}
 
   {screen==='wallet'&&<>
    {!g.live||!me.in?<div className="card mute">Nothing to pay yet. Join or start a group order first.</div>:<div className="card">
     <div className="row"><b className="sp">{g.name}</b>{pstat(me)}</div>
     <div className="big" style={{margin:'8px 0'}}>{$(g.pay==='sponsor'?(isOrg?groupTotal:0):owed(me))}</div>
-    <div className="mute">{g.pay==='sponsor'?(isOrg?'You pay once for everyone after ordering closes.':org.n+' is paying for everyone.'):me.sub?(me.paid?'Paid.':'Payment needed.'):'Submit your order to see what you owe.'}</div>
-    {g.pay==='individual'&&me.sub&&!me.paid&&!me.dirty&&!g.sent&&<button className="btn" style={{marginTop:12}} onClick={()=>{setPm('me');setScr('pay')}}>Pay {$(owed(me))}</button>}
-    {g.pay==='sponsor'&&isOrg&&!g.sent&&<><button className="btn" style={{marginTop:12}} disabled={!canSend} onClick={()=>{setPm('group');setScr('pay')}}>Pay {$(groupTotal)} and send to outlet</button>{!canSend&&<div className="mute" style={{marginTop:8}}>{why}</div>}</>}</div>}
+    <div className="mute">{g.pay==='sponsor'?(isOrg?(g.sent?'Charged when you sent the order.':'You pay once, when you send the order to the outlet.'):org.n+' is paying for everyone.'):!me.sub?'Submit your order to see what you owe.':g.sent?(me.paid?'Charged when the organiser sent the order.':'Nothing to pay.'):owed(me)===0?'Nothing to pay.':me.pmeth?'Payment method: '+mName(me.pmeth,uid)+'. You are only charged when the organiser sends the order.':'Choose a payment method. You are only charged when the organiser sends the order.'}</div>
+    {g.pay==='individual'&&me.sub&&!g.sent&&owed(me)>0&&<button className={'btn'+(me.pmeth?' ghost':'')} style={{marginTop:12}} onClick={()=>goPay('me')}>{me.pmeth?'Change payment method':'Choose payment method'}</button>}
+    {g.pay==='sponsor'&&isOrg&&!g.sent&&<><button className="btn" style={{marginTop:12}} disabled={!canSend} onClick={()=>goPay('group')}>Pay {$(groupTotal)} and send to outlet</button>{!canSend&&<div className="mute" style={{marginTop:8}}>{why}</div>}</>}</div>}
    <div className="h3">Payment methods</div>
-   <div className="opt on"><b>{meth}</b></div>
-   {receipt&&<><div className="h3">Latest payment</div><div className="card"><div className="row"><Icon n="receipt"/><div className="sp"><b>{$(receipt.amt)}</b><div className="mute">{new Date(receipt.at).toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'})} · {new Date(receipt.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}<br/>{meth}</div></div><Tag c="ok">Paid</Tag></div><div className="mute" style={{marginTop:10}}>{receipt.items.map(i=>i.name+(i.q>1?' ×'+i.q:'')).join(', ')}</div></div></>}
+   {METHODS.map(k=><div key={k} className={'opt static'+((me.pmeth||'card')===k?' on':'')}><b>{mName(k,uid)}</b>{k==='card'&&<div className="mute">Default payment method</div>}</div>)}
+   {g.sent&&me.in&&!!me.paid&&me.paidAmt>0&&<><div className="h3">Latest payment</div><div className="card"><div className="row"><Icon n="receipt"/><div className="sp"><b>{$(me.paidAmt)}</b><div className="mute">{fdt(g.sentAt)}<br/>{me.paidMeth}</div></div><Tag c="ok">Paid</Tag></div><div className="mute" style={{marginTop:10}}>{(g.pay==='sponsor'?subm.flatMap(p=>p.items):me.items).map(i=>i.name+(i.q>1?' ×'+i.q:'')).join(', ')}</div></div></>}
   </>}
 
   {screen==='rewards'&&<>
    <div className="hero" style={{textAlign:'center'}}><div className="mute">Cherish points</div><div className="big">{me.pts}</div><div className="mute">{g.live&&!g.sent&&me.items.length>0?'You will earn about '+pts10(owed(me))+' points on your current order.':'Order with a group to earn points.'}</div></div>
    <div className="mute" style={{marginBottom:8}}>Rewards apply only to your own items. To use one, open My order in a group order and choose View eligible rewards.</div>
-   {REWARDS.map(r=>{const okp=me.pts>=r.cost,okm=sum(me.items)>=r.min,on=rw(me)&&rw(me).id===r.id;return <div key={r.id} className={'opt static '+(on?'on':okp?'':'dis')}><div className="row"><b className="sp">{r.t}</b>{on?<Tag c="v">Applied</Tag>:okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.cost} points</div></div>})}
+   {REWARDS.map(r=>{const okp=me.pts>=r.cost;return <div key={r.id} className={'opt static '+(okp?'':'dis')}><div className="row"><b className="sp">{r.t}</b>{okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.cost} points</div></div>})}
    <div className="h3">Points history</div>
    {me.hist.length===0?<div className="card mute">No activity yet. Points you earn or spend will show up here.</div>:
     me.hist.map((h,i)=><div className="card row" key={i}><div className="sp"><b>{h.note}</b><div className="mute">{new Date(h.at).toLocaleDateString([],{day:'numeric',month:'short'})} · {new Date(h.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</div></div><b style={{color:h.amt>=0?'var(--ok)':'var(--voucher)'}}>{h.amt>=0?'+':''}{h.amt} points</b></div>)}
@@ -498,10 +565,10 @@ function App(){
 
   {screen==='more'&&<>
    <div className="card row"><div className="av"><Icon n="star"/></div><div className="sp"><b>{me.n}</b><div className="mute">Cherish account linked · {me.pts} points</div></div></div>
-   {[['clock','Saved groups and previous orders',()=>setScr('repeat'),false],['bell','Notifications',()=>{setNotes(n=>n.map(x=>({...x,new:0})));setScr('notifs')},notes.some(n=>n.new)],['gear','Demo controls',()=>setSheet({k:'demo'}),false],['door','Log out',()=>{setIdf('');setPwd('');setLoginErr('');setScr('login')},false]].map(([ic,l,f,dot])=><div className="card row click" key={l} onClick={f}><Icon n={ic}/><b className="sp">{l}</b>{dot&&<i className="dot-inline"/>}<Icon n="chev" s={16}/></div>)}
+   {[['clock','Saved groups and previous orders',()=>setScr('repeat'),false],['bell','Notifications',()=>{markSeen();setScr('notifs')},hasNew],['gear','Demo controls',()=>setSheet({k:'demo'}),false],['door','Log out',()=>{setIdf('');setPwd('');setLoginErr('');setScr('login')},false]].map(([ic,l,f,dot])=><div className="card row click" key={l} onClick={f}><Icon n={ic}/><b className="sp">{l}</b>{dot&&<i className="dot-inline"/>}<Icon n="chev" s={16}/></div>)}
   </>}
 
-  {screen==='notifs'&&<>{notes.length===0&&<div className="card mute">No notifications yet.</div>}{notes.map((n,i)=><div className="card row" key={i}><div className="em" style={{width:40,height:40}}><Icon n={n.i}/></div><div className="sp">{n.t}</div></div>)}</>}
+  {screen==='notifs'&&<>{myNotes.length===0&&<div className="card mute">No notifications yet.</div>}{myNotes.map((n,i)=><div className="card row" key={i}><div className="em" style={{width:40,height:40}}><Icon n={n.i}/></div><div className="sp">{n.t}</div></div>)}</>}
   </div>
 
   <div className="nav">{[['home','Home','home'],['order','Order','menu'],['pay','Pay','wallet'],['rewards','Rewards','rewards'],['more','More','more']].map(([k,l,to])=>
@@ -517,7 +584,7 @@ function App(){
     <button className="btn sp" onClick={addToCart}>Add to order · {$((sheet.m.price+((sheet.m.set||sheet.m.dr)&&sheet.temp.startsWith('Iced')?0.6:0))*sheet.q)}</button></div></>}
    {sheet.k==='rewards'&&<><b style={{fontSize:18}}>Your Cherish rewards</b><div className="mute" style={{marginBottom:10}}>Rewards apply only to your own items.</div>
     {/* TODO(backend): GET /cherish/rewards. Validate and reserve the reward for this user only. */}
-    {REWARDS.map(r=>{const okp=me.pts>=r.cost,okm=sum(me.items)>=r.min,ok=okp&&okm;return <div key={r.id} className={'opt '+(okp?'':'dis')} onClick={()=>{if(!okp)return;if(!okm){say('Spend '+$(r.min)+' or more to use '+r.t,1);return}upd(uid,x=>({rw:r.id,...staleIfChanged(x,x.items,r.id)}));setSheet(null);say(r.t+' applied · uses '+r.cost+' points on collection',1)}}><div className="row"><b className="sp">{r.t}</b>{okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.cost} points{okp&&!okm?' · add '+$(r.min-sum(me.items))+' more to your order to use it':''}</div></div>})}</>}
+    {REWARDS.map(r=>{const okp=me.pts>=r.cost,okm=sum(me.items)>=r.min,ok=okp&&okm;return <div key={r.id} className={'opt '+(okp?'':'dis')} onClick={()=>{if(!okp)return;if(!okm){say('Spend '+$(r.min)+' or more to use '+r.t,1);return}upd(uid,{rw:r.id});setSheet(null);say(r.t+' applied · uses '+r.cost+' points when the order is sent',1,1500)}}><div className="row"><b className="sp">{r.t}</b>{okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.cost} points{okp&&!okm?' · add '+$(r.min-sum(me.items))+' more to your order to use it':''}</div></div>})}</>}
    {sheet.k==='slot'&&<><b style={{fontSize:20}}>Pickup time and group size</b>
     <div className="mute" style={{margin:'6px 0 4px'}}>A smaller group can open up more pickup times.</div>
     <label className="l">Group size</label>
@@ -526,11 +593,18 @@ function App(){
     <div className="chips">{Object.keys(outlet.slots).map(t=><button key={t} className={'chip '+(g.slot===t&&slotValid?'on':'')} disabled={outlet.slots[t]<g.size||(g.slotGone&&t===g.slot)} onClick={()=>{setG(x=>({...x,slot:t,slotGone:false}));note('Pickup time changed to '+t,'clock')}}>{t}</button>)}</div>
     {!slotValid&&<Ban c="e"><span style={{display:'block',marginTop:14}}>Pick a time that fits {g.size} people.</span></Ban>}
     <button className="btn" style={{marginTop:22}} onClick={()=>setSheet(null)}>Done</button></>}
-   {sheet.k==='hist'&&<><b style={{fontSize:18}}>{sheet.h.name}</b><div className="mute">#{sheet.h.id} · {sheet.h.date}</div><div className="h3">Your order</div>
-    {sheet.h.mine.map((i,k)=><div className="row" key={k} style={{padding:'4px 0'}}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}</span>{$(i.p*i.q)}</div>)}
-    <button className="btn" style={{marginTop:14}} onClick={()=>reorder(sheet.h)}>Reorder with changes</button></>}
+   {sheet.k==='hist'&&(()=>{const h=sheet.h,m=h.orders[uid];return <><b style={{fontSize:18}}>{h.name}</b>
+    <div className="mute">#{h.id} · {fdt(h.at)}</div>
+    <div className="mute">{h.outlet} · pickup {h.slot}{h.coll?' · collection '+h.coll:''}</div>
+    <div className="mute">{STAT[h.status]} · {h.pay==='sponsor'?'Organiser paid for everyone':'Everyone paid for their own order'}</div>
+    <div className="h3">Your order</div>
+    {m?<>{m.items.map((i,k)=><div className="row" key={k} style={{padding:'4px 0'}}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}{i.q>1&&<div className="mute">× {i.q}</div>}</span>{$(i.p*i.q)}</div>)}
+     <div className="row" style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--line)'}}><b className="sp">{h.pay==='sponsor'&&!isOrg?'Paid by '+USERS0[0].n:'You paid'}</b><b>{h.pay==='sponsor'&&!isOrg?$(0):$(m.owed)}</b></div>
+     <div className="mute" style={{marginTop:4}}>{m.earn} Cherish points earned</div></>:<div className="mute">You didn't submit an order in this group.</div>}
+    {isOrg&&<><div className="h3">Who got what</div><div className="card">{Object.entries(h.orders).map(([k,o])=><div key={k} style={{padding:'6px 0'}}><b>{USERS0[k].n}</b>{o.items.map((i,x)=><div className="mute" key={x}>{itemLine(i)}</div>)}</div>)}<div className="row" style={{marginTop:6}}><span className="sp mute">Group total</span><b>{$(h.total)}</b></div></div></>}
+    {m&&<button className="btn" style={{marginTop:14}} onClick={()=>reorder(h)}>Reorder with changes</button>}</>})()}
    {sheet.k==='invite'&&<><div className="row"><Icon n="check" s={26}/><b style={{fontSize:18}}>Invite link copied</b></div>
-    <div className="card mute" style={{marginTop:12,wordBreak:'break-all'}}>yakun.app/together/YT1024</div>
+    <div className="card mute" style={{marginTop:12,wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div>
     <div className="h3" style={{marginTop:4}}>Group order right now</div>
     <div className="card"><b>{g.name}</b><div className="mute" style={{margin:'4px 0 8px'}}>Organiser {org.n} · Deadline {g.deadline}<br/>{outlet.n} · collect at {g.slot}<br/>{g.pay==='sponsor'?org.n+' is paying for everyone':'Everyone pays for their own order'}</div>
      {members.map(p=><div key={p.id} style={{padding:'5px 0',borderTop:'1px solid var(--line)'}}><b>{p.n}</b> <span className="mute">{p.sub?lines(p):waitText(p)}</span></div>)}
@@ -538,14 +612,14 @@ function App(){
     </>}
    {sheet.k==='expired'&&<><div style={{textAlign:'center'}}><Icon n="clock" s={40}/><h2 className="ttl" style={{marginTop:8}}>Time is up</h2><div className="mute" style={{marginBottom:18}}>{subm.length} of {members.length} people submitted. What would you like to do?</div></div>{expiredBtns}</>}
    {sheet.k==='confirmPay'&&<><h2 className="ttl">Confirm payment</h2>
-    <div className="card">{(pm==='group'?subm.flatMap(p=>p.items):me.items).map((i,k)=><div className="row" key={k} style={{padding:'4px 0'}}><span className="sp">{i.name}{i.q>1?' ×'+i.q:''}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}</span>{$(i.p*i.q)}</div>)}
-     <div className="row" style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--line)'}}><span className="sp">Subtotal</span>{$(pm==='group'?subm.reduce((s,p)=>s+sum(p.items),0):sum(me.items))}</div>
-     {(pm==='group'?subm.reduce((s,p)=>s+(sum(p.items)-owed(p)),0):sum(me.items)-owed(me))>0&&<div className="row voucher"><span className="sp">{pm==='group'?'Vouchers applied':rw(me).t}</span>−{$(pm==='group'?subm.reduce((s,p)=>s+(sum(p.items)-owed(p)),0):sum(me.items)-owed(me))}</div>}
-     <div className="row" style={{marginTop:6,paddingTop:6,borderTop:'1px solid var(--line)'}}><b className="sp">Total</b><b>{$(pm==='group'?groupTotal:owed(me))}</b></div></div>
-    <div className="opt on"><b>{meth}</b></div>
-    <div className="mute" style={{margin:'10px 0 8px'}}>This authorises {$(pm==='group'?groupTotal:owed(me))} now. It's captured when the group order is sent to the outlet.</div>
+    <div className="card">{subm.flatMap(p=>p.items).map((i,k)=><div className="row" key={k} style={{padding:'4px 0'}}><span className="sp">{i.name}{i.q>1?' ×'+i.q:''}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}</span>{$(i.p*i.q)}</div>)}
+     <div className="row" style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--line)'}}><span className="sp">Subtotal</span>{$(subm.reduce((s,p)=>s+sum(p.items),0))}</div>
+     {subm.reduce((s,p)=>s+(sum(p.items)-owed(p)),0)>0&&<div className="row voucher"><span className="sp">Vouchers applied</span>−{$(subm.reduce((s,p)=>s+(sum(p.items)-owed(p)),0))}</div>}
+     <div className="row" style={{marginTop:6,paddingTop:6,borderTop:'1px solid var(--line)'}}><b className="sp">Total</b><b>{$(groupTotal)}</b></div></div>
+    <div className="opt on"><b>{mName(sel,uid)}</b></div>
+    <div className="mute" style={{margin:'10px 0 8px'}}>{$(groupTotal)} will be charged to this payment method as the group order is sent to the outlet.</div>
     <div className="mute" style={{margin:'0 0 18px'}}>You will earn about <b>{pts10(owed(me))} Cherish points</b> when the group order is collected.</div>
-    <button className="btn" onClick={()=>{setSheet(null);doPay()}}>Confirm and pay {$(pm==='group'?groupTotal:owed(me))}</button>
+    <button className="btn" onClick={()=>{setSheet(null);doPay()}}>Pay {$(groupTotal)} and send</button>
     <button className="btn ghost" style={{marginTop:10}} onClick={()=>setSheet(null)}>Back</button></>}
    {sheet.k==='confirm'&&<><h2 className="ttl">{sheet.title}</h2><div className="mute" style={{marginBottom:18}}>{sheet.msg}</div><button className="btn" onClick={sheet.action}>{sheet.label}</button><button className="btn ghost" style={{marginTop:10}} onClick={()=>setSheet(null)}>Cancel</button></>}
    {sheet.k==='cancel'&&<><h2 className="ttl">Cancel this group order?</h2><div className="mute" style={{marginBottom:18}}>Everyone's items are removed and the invite link stops working.</div><button className="btn" onClick={cancelOrder}>Cancel group order</button><button className="btn ghost" style={{marginTop:10}} onClick={()=>setSheet(null)}>Keep order</button></>}
@@ -555,12 +629,12 @@ function App(){
     {[['Others submit their orders',othersDone],['Deadline passes',()=>{setG(x=>({...x,deadlineAt:Date.now()}));setSheet(null)}],
      ['Peanut Butter Toast Set sells out',()=>{setG(x=>({...x,sold:x.sold.length?[]:[3]}));note('Item availability changed at '+outlet.n,'alert');setSheet(null)}],
      ['Collection slot fills up',()=>{setG(x=>({...x,slotGone:true}));note(g.slot+' is no longer available','alert');setSheet(null)}],
-     [g.failNext?'Next payment will fail (on)':'Make the next payment fail',()=>{setG(x=>({...x,failNext:!x.failNext}));setSheet(null)}],
+     [g.failNext?'Next charge will be declined (on)':'Make the next charge be declined',()=>{setG(x=>({...x,failNext:!x.failNext}));setSheet(null)}],
      ['Advance order status (outlet)',()=>{advance();setSheet(null)}]].map(([t,f])=><button key={t} className="btn ghost sm" style={{width:'100%',marginBottom:8}} onClick={f}>{t}</button>)}
     <label className="l">Invitation link</label><div className="chips">{['valid','expired','full'].map(v=><button key={v} className={'chip '+(g.inv===v?'on':'')} onClick={()=>setG(x=>({...x,inv:v}))}>{v}</button>)}</div>
     <button className="btn ghost sm" style={{width:'100%',marginTop:14}} onClick={()=>window.location.reload()}>Reset demo</button></>}
   </div></div>}
-  {banner&&<div className="push" onClick={()=>{setBanner(null);setNotes(n=>n.map(x=>({...x,new:0})));setScr('notifs')}}><Icon n={banner.i} s={18}/><div className="sp"><b>Ya Kun Together</b><div className="mute">{banner.t}</div></div></div>}
+  {banner&&<div className="push" onClick={()=>{setBanners([]);markSeen();setScr('notifs')}}><Icon n={banner.i} s={18}/><div className="sp"><b>Ya Kun Together</b><div className="mute">{banner.t}</div></div></div>}
   {toast&&<div className={'toast'+(toast.mid?' mid':'')}>{toast.t}</div>}
  </div>;
 }

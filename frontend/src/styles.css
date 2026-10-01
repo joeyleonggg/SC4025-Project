@@ -61,7 +61,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 .pwRow{position:relative}
 .pwRow .li{padding-right:64px}
 .pwToggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--red);font:700 12px Arial,sans-serif;cursor:pointer;padding:6px}
-.loginErr{background:#fff;color:#9B1B2F;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:700;margin-bottom:4px}
+/* plain text on the dark login background, no white box */
+.loginErr{background:none;color:#FFB3BD;padding:0;font-size:14px;line-height:1.4;font-weight:700;margin-bottom:4px}
 .loginLinks{display:flex;justify-content:space-between;margin-top:14px}
 .linkLight{background:none;border:0;color:#fff;opacity:.9;font:700 12px Arial,sans-serif;cursor:pointer;padding:4px 0}
 .linkLight:hover{opacity:1;text-decoration:underline}

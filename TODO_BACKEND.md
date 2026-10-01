@@ -14,8 +14,8 @@ Every place in the frontend that needs backend work is already marked `TODO(back
 3. **Own the deadline**: ordering closes when time is up, not when the phone says so; reminders shortly before.
 4. **Protect orders**: nobody can edit another person's order; participants must not see others' payment info (organiser sees paid / unpaid only).
 5. **Price on the server**: recompute totals from the menu; never trust prices sent by the screen. Iced drinks add $0.60.
-6. **Handle payment**: authorise on pay, capture only when the organiser sends; editing a paid order invalidates the old authorisation; block "send" while anyone is unpaid (individual mode).
-7. **Handle rewards**: a voucher applies to the owner's own items only, needs enough points and minimum spend, and points are deducted only when the order is sent.
+6. **Handle payment**: a participant only *selects a payment method* when submitting; **nothing is charged and no payment notification is sent until the organiser sends the order**. On send, charge each person their own amount (or the organiser the group total in "I pay for everyone" mode) and notify only that person. Block "send" while anyone in individual mode has no payment method.
+7. **Handle rewards**: a voucher applies to the owner's own items only, needs enough points and minimum spend, and points are deducted only when the order is sent. Notifications are addressed to specific people (e.g. a reminder goes only to the person reminded; "reminder set" only to group members).
 8. **Consolidate**: combine all submitted orders into one, keep each person's customisation, issue one collection number, keep the who-gets-what list.
 9. **Credit points**: when the organiser marks collected, each person earns points on *their own* amount (currently $1 = 10 points).
 10. **Outlet capacity**: a pickup slot is only valid if it fits the group size; re-check when sending.
