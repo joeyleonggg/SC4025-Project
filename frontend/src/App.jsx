@@ -373,7 +373,7 @@ function App(){
 
   {screen==='home'&&<>
    {isOrg&&<div className="hero"><h2>Breakfast for the whole team, one order.</h2><p className="mute" style={{marginBottom:14}}>Everyone picks their own food, pays their own way and earns their own Cherish points.</p>{(()=>{const active=g.live&&!g.cancelled&&!(g.sent&&g.status==='collected');return <button className="btn" onClick={()=>active?setScr(g.sent?'done':'group'):newOrder()}>{active?(g.sent?'View my group order':'Open my group order'):'Start Ya Kun Together'}</button>})()}</div>}
-   <div className="card row"><div className="av"><Icon n="star"/></div><div className="sp"><b>Cherish account</b><div className="mute">{me.n} · linked</div></div><div style={{textAlign:"right"}}><div className="big" style={{fontSize:26}}>{avail}</div>{hold>0&&<div className="mute">− {hold} points</div>}</div></div>
+   <div className="card row"><div className="av"><Icon n="star"/></div><div className="sp"><b>Cherish account</b><div className="mute">{me.n} · linked</div></div><div style={{textAlign:"right"}}><div className="big" style={{fontSize:26}}>{avail}</div>{hold>0&&<div className="mute" style={{color:"var(--voucher)",fontWeight:700}}>− {hold} points</div>}</div></div>
    {g.live&&me.in?<div className="card click" onClick={()=>setScr(g.sent?'done':'group')} style={{borderColor:'var(--red)'}}><b>{g.name}</b><div className="mute">{statusText}{!g.closed&&!g.sent&&!g.cancelled&&<ClosesIn target={g.deadlineAt}/>}</div></div>
     :g.live&&!g.cancelled?<div className="card click" onClick={()=>setScr('join')} style={{borderColor:'var(--red)'}}><b>{org.n} invited you to {g.name}</b><div className="mute">Tap to view the invitation</div></div>
     :!isOrg&&<div className="card mute">No active group order right now. You can still browse the menu and your rewards, and join as soon as you get an invitation link.</div>}
@@ -405,7 +405,7 @@ function App(){
     <h2 className="ttl">Ordering time and payment</h2>
     <label className="l">How long can people order?</label>
     <div className="chips">{[5,10,15,30].map(m=>{const late=!!slotAt&&Date.now()+m*60000>slotAt;return <button key={m} disabled={late} className={'chip '+(g.win===m&&!late?'on':'')} onClick={()=>setG({...g,win:m})}>{m} minutes</button>})}</div>
-    <div className="mute" style={{marginTop:10}}>Ordering closes at {tm(Date.now()+g.win*60000)}, before the {g.slot} collection time. Everyone sees a countdown and gets a reminder.</div>
+    <div className="mute" style={{marginTop:10}}>Ordering closes at {tm(Date.now()+g.win*60000)}. Everyone sees a countdown and gets a reminder.</div>
     <label className="l">Who pays?</label>
     <div className={'opt '+(g.pay==='individual'?'on':'')} onClick={()=>setG({...g,pay:'individual'})}><b>Everyone pays for their own</b></div>
     <div className={'opt '+(g.pay==='sponsor'?'on':'')} onClick={()=>setG({...g,pay:'sponsor'})}><b>I will pay for everyone</b></div>
@@ -560,7 +560,7 @@ function App(){
     <div className="mute" style={{marginTop:4}}><Icon n="clock" s={14}/> {fdt(h.at)}</div>
     <div className="mute"><Icon n="pin" s={14}/> {h.outlet} · pickup {h.slot}</div>
     <div className="mute">#{h.id} · {h.members.join(', ')}</div>
-    <div className="expand">{m?<><b>What you ordered</b>{m.items.map((i,k)=><div className="row" key={k}><span className="sp">{itemLine(i)}</span>{$(i.p*i.q)}</div>)}</>:<div className="mute">You didn't submit an order in this group.</div>}</div>
+    <div className="expand"><b>What everyone ordered</b>{Object.entries(h.orders).map(([k,o])=><div key={k} style={{padding:'6px 0'}}><b>{USERS0[k].n}{+k===uid?' (you)':''}</b>{o.items.map((i,x)=><div className="row" key={x}><span className="sp mute">{itemLine(i)}</span>{(isOrg||+k===uid)&&<span>{$(i.p*i.q)}</span>}</div>)}{o.free&&<div className="mute">Free {o.free} (reward)</div>}</div>)}{!m&&<div className="mute" style={{marginTop:4}}>You didn't submit an order in this group.</div>}</div>
     <div className="row" style={{marginTop:10}}><button className="btn sm ghost" onClick={()=>setSheet({k:'hist',h})}>Details</button><button className="btn sm" disabled={!isOrg} onClick={()=>startFrom({name:h.name})}>Reuse group</button></div></div>})}
   </>}
 
@@ -623,7 +623,7 @@ function App(){
     {m?<>{m.items.map((i,k)=><div className="row" key={k} style={{padding:'4px 0'}}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}{i.q>1&&<div className="mute">× {i.q}</div>}</span>{$(i.p*i.q)}</div>)}{m.free&&<div className="row" style={{padding:'4px 0'}}><span className="sp">{m.free}<div className="mute">Free reward</div></span>{$(0)}</div>}
      <div className="row" style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--line)'}}><b className="sp">{h.pay==='sponsor'&&!isOrg?'Paid by '+USERS0[0].n:'You paid'}</b><b>{h.pay==='sponsor'&&!isOrg?$(0):$(m.owed)}</b></div>
      <div className="mute" style={{marginTop:4}}>{m.earn} Cherish points earned</div></>:<div className="mute">You didn't submit an order in this group.</div>}
-    {isOrg&&<><div className="h3">Who got what</div><div className="card">{Object.entries(h.orders).map(([k,o])=><div key={k} style={{padding:'6px 0'}}><b>{USERS0[k].n}</b>{o.items.map((i,x)=><div className="mute" key={x}>{itemLine(i)}</div>)}</div>)}<div className="row" style={{marginTop:6}}><span className="sp mute">Group total</span><b>{$(h.total)}</b></div></div></>}
+    <div className="h3">Who got what</div><div className="card">{Object.entries(h.orders).map(([k,o])=><div key={k} style={{padding:'6px 0'}}><b>{USERS0[k].n}{+k===uid?' (you)':''}</b>{o.items.map((i,x)=><div className="mute" key={x}>{itemLine(i)}</div>)}{o.free&&<div className="mute">Free {o.free} (reward)</div>}</div>)}{isOrg&&<div className="row" style={{marginTop:6}}><span className="sp mute">Group total</span><b>{$(h.total)}</b></div>}</div>
     {m&&<button className="btn" style={{marginTop:14}} onClick={()=>reorder(h)}>Reorder with changes</button>}</>})()}
    {sheet.k==='invite'&&<><div className="row"><Icon n="check" s={26}/><b style={{fontSize:18}}>Invite link copied</b></div>
     <div className="card mute" style={{marginTop:12,wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div>
