@@ -203,3 +203,7 @@ button:not(:disabled){cursor:pointer}
 .toast.mid{width:88%;max-width:380px;min-width:300px;padding:22px 28px}
 /* Extend / Close ordering: identical size */
 .btn.pair{flex:1 1 0;min-width:0;height:46px;box-sizing:border-box;border:2px solid var(--red);white-space:nowrap}
+
+/* pop-up boxes are vertically centred (messages already are; sheets used to sit at the bottom) */
+.sheet-bg{align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.sheet{border-radius:24px;max-height:84%;width:100%}

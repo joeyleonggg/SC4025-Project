@@ -9,7 +9,7 @@ export const DEADLINES = ['8:15 AM', '8:30 AM', '8:45 AM', '9:00 AM'];
 export const MENU = [
  {id:1,cat:'Sets',name:'Kaya Toast Set',price:5.2,desc:'2 toast, 2 soft-boiled eggs, kopi or teh',set:1,e:'toast',img:''},
  {id:2,cat:'Sets',name:'French Toast Set',price:5.6,desc:'Kaya French toast, 2 eggs, kopi or teh',set:1,e:'toast',img:''},
- {id:3,cat:'Sets',name:'Peanut Butter Toast Set',price:5.2,desc:'Crunchy PB toast, 2 eggs, kopi or teh',set:1,e:'toast',img:''},
+ {id:3,cat:'Sets',name:'Peanut Butter Toast Set',price:5.2,desc:'Crunchy peanut butter toast, 2 eggs, kopi or teh',set:1,e:'toast',img:''},
  {id:4,cat:'Toast',name:'Butter Kaya Toast',price:2.4,desc:'Thin crispy toast, kaya and butter',e:'toast',img:''},
  {id:5,cat:'Toast',name:'Soft-boiled Eggs (2)',price:1.8,desc:'With soy sauce and white pepper',e:'egg',img:''},
  {id:6,cat:'Drinks',name:'Kopi',price:1.7,desc:'Coffee with condensed milk',dr:1,e:'cup',img:''},
@@ -54,9 +54,9 @@ export const DEMO_ORDERS = {
  8:[{id:2,name:'French Toast Set',o:'Kopi',q:1,p:5.6},{id:8,name:'Milo',o:'Normal, hot',q:1,p:2.4}],
  9:[{id:1,name:'Kaya Toast Set',o:'Kopi O, kosong',q:1,p:5.2}]};
 export const SAVED0 = [
- {name:'Marketing Team',members:['Ben','Calvin','Dylan']},
- {name:'Friday Breakfast Crew',members:['Ben','Dylan','Eve']},
- {name:'Project Team',members:['Calvin','Eve']}];
+ {name:'Marketing Team',members:['Alex','Ben','Calvin','Dylan']},
+ {name:'Friday Breakfast Crew',members:['Alex','Ben','Dylan','Eve']},
+ {name:'Project Team',members:['Alex','Calvin','Eve']}];
 // Previous group orders. Each entry keeps the date/time, outlet, pickup slot and EVERY submitted member's own items,
 // so each person sees "what I ordered" and the organiser sees "who got what".
 // TODO(backend): GET /group-orders/history (participants only receive their own order).

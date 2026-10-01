@@ -7,9 +7,10 @@ import './styles.css';
 // Open the gear button (top right of the phone) to switch between organiser and participant views and to trigger error states.
 
 const pts10 = v => Math.floor(v*10);
+const TOAST_MS = 500;   // every pop-up message disappears after 0.5 seconds
 // Payment methods a person can pick. Picking one does NOT charge anything; the charge happens when the organiser sends the order.
-const METHODS = ['card','apple','paynow'];
-const mName = (id,u) => id==='apple'?'Apple Pay':id==='paynow'?'PayNow':'Card ending '+CARD_LAST4[u];
+const METHODS = ['card'];   // Ya Kun only supports its card payment
+const mName = (id,u) => 'Card ending '+CARD_LAST4[u];
 const STAT = {preparing:'Being prepared',ready:'Ready for collection',collected:'Collected'};
 const fdt = ms => new Date(ms).toLocaleDateString([],{weekday:'short',day:'numeric',month:'short',year:'numeric'})+' · '+tm(ms);
 const IC={
@@ -81,6 +82,7 @@ function App(){
  const [notes,setNotes]=useState([]);
  const [toast,setToast]=useState('');
  const [saved,setSaved]=useState(SAVED0);
+ const [preset,setPreset]=useState([]);   // names invited from a saved group; empty = brand-new team, organiser adds people later
  const [hist,setHist]=useState(HIST0);
  const [ren,setRen]=useState(null);
  const [err,setErr]=useState('');
@@ -130,7 +132,7 @@ function App(){
  const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist];
  const myHist=histAll.filter(h=>h.orders[uid]||(uid===0&&h.members.includes(USERS0[0].n)));
 
- const say=(t,mid,ms)=>{clearTimeout(toastT.current);setToast({t,mid:true});toastT.current=setTimeout(()=>setToast(''),ms||2500)};
+ const say=(t)=>{clearTimeout(toastT.current);setToast({t,mid:true});toastT.current=setTimeout(()=>setToast(''),TOAST_MS)};
  const login=()=>{
   // TODO(backend): POST /auth/cherish {identifier,password} -> token + user. Never keep real passwords client-side.
   const acc=ACCOUNTS.find(a=>a.identifier.toLowerCase()===idf.trim().toLowerCase());
@@ -145,7 +147,7 @@ function App(){
  };
  const upd=(id,f)=>setP(p=>p.map(x=>x.id===id?{...x,...(typeof f==='function'?f(x):f)}:x));
  const setItems=f=>upd(uid,x=>{const it=f(x.items),r=REWARDS.find(r=>r.id===x.rw),drop=r&&sum(it)<r.min,newRw=drop?null:x.rw;return {items:it,rw:newRw,dirty:x.sub?1:0}});
- const setSize=n=>{if(n>MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`,1,1500);n=MAXSIZE}setG(x=>({...x,size:Math.max(2,n)}))};
+ const setSize=n=>{const min=Math.max(2,preset.length);if(n>MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`);n=MAXSIZE}if(n<min&&preset.length>2)say(`${preset.length} people are in this saved group`);setG(x=>({...x,size:Math.max(min,n)}))};
  const setOutlet=i=>setG(x=>{const idx=x.slotTimes.indexOf(x.slot),ok=idx>=0&&OUTLET_CAPS[i].caps[idx]>=x.size;return {...x,oi:i,slot:ok?x.slot:''}});
 
 
@@ -161,27 +163,28 @@ function App(){
   // TODO(backend): POST /groups {name,deadline,outletId,slot,size,payMode} -> groupId + invite URL. Server enforces max size and slot capacity, and schedules deadline reminders.
   const at=Date.now()+g.win*60000;
   setG(x=>({...x,live:true,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
-  const inv=Array.from({length:Math.min(g.size,P.length)-1},(_,k)=>k+1); // invite as many people as the group size
+  const inv=P.filter(x=>!x.org&&preset.includes(x.n)).slice(0,g.size-1).map(x=>x.id); // only the saved group's members; a new team starts with just the organiser
   setP(p=>p.map(x=>inv.includes(x.id)?{...x,in:1}:x));
-  note('Invitations sent for '+g.name,'mail',[0]);note(org.n+' invited you to '+g.name,'mail',inv);
+  if(inv.length){note('Invitations sent for '+g.name,'mail',[0]);note(org.n+' invited you to '+g.name,'mail',inv);}
   note('Reminder set: ordering closes at '+tm(at),'clock',[0,...inv]); // only the people in this group
   setStep(4);say('Group created');
  };
  // A group order that is open or still being collected is never overwritten. A collected one is archived into the order history first.
- const begin=name=>{
+ const begin=(name,members)=>{
   if(g.live&&!g.cancelled&&!(g.sent&&g.status==='collected')){
    say(g.sent?'Your current group order is still in progress':'Finish or cancel your current group order first',1,2000);setScr(g.sent?'done':'group');return;
   }
   const arch=g.live&&g.sent&&!g.cancelled;
   if(arch)setHist(h=>[snapshot(),...h]);
   const n=hist.filter(h=>h.s).length+(arch?1:0);
-  setG({...freshG(n),...(name?{name}:{})});
+  setG({...freshG(n),...(name?{name}:{}),...(members?{size:Math.min(MAXSIZE,Math.max(2,members.length))}:{})});
+  setPreset(members||[]);
   setP(p=>p.map(x=>({...blank(USERS0[x.id]),pts:x.pts,hist:x.hist})));
   setStep(1);setScr('create');
  };
  const startFrom=s=>{
   // TODO(backend): GET /saved-groups/:id and POST /groups with the saved members invited again.
-  begin(s.name);
+  begin(s.name,s.members);
  };
  const newOrder=()=>begin();
  const cancelOrder=()=>{
@@ -218,14 +221,14 @@ function App(){
  const saveGroup=()=>{
   // TODO(backend): POST /saved-groups {name,memberIds}
   if(saved.some(s=>s.name===g.name))return say('Already saved');
-  setSaved(s=>[...s,{name:g.name,members:members.filter(x=>!x.org).map(x=>x.n)}]);say('Group saved',1);
+  setSaved(s=>[...s,{name:g.name,members:members.map(x=>x.n)}]);say('Group saved');
  };
  // TODO(backend): this is a placeholder address. For a link to open in another browser or phone, the group must live somewhere shared
  // (a server, Firebase/Supabase, or at minimum a BroadcastChannel between tabs of ONE browser) and the app must read the group id/token from the URL.
  const copyLink=()=>{
   // TODO(backend): use the invite URL returned by POST /groups (expires when the order completes or is cancelled).
   try{navigator.clipboard.writeText('https://yakun.app/together/'+g.gid).catch(()=>{})}catch(e){}
-  setSheet({k:'invite'});
+  say('Invite link copied');
  };
  const remind=(p,type)=>{
   // TODO(backend): POST /groups/:id/remind {userId,type} -> push notification
@@ -364,7 +367,7 @@ function App(){
    {step<4&&<div className="steps">{[1,2,3].map(n=><i key={n} className={n<=step?'on':''}/>)}</div>}
    {step===1&&<>
     <h2 className="ttl">Who is ordering?</h2>
-    {saved.length>0&&<><label className="l">Start from a saved group</label><div className="chips">{saved.map((s,i)=><button key={i} className={'chip '+(g.name===s.name?'on':'')} onClick={()=>setG(x=>({...x,name:s.name}))}>{s.name}</button>)}</div></>}
+    {saved.length>0&&<><label className="l">Start from a saved group</label><div className="chips">{saved.map((s,i)=>{const on=preset.join()===s.members.join();return <button key={i} className={'chip '+(on?'on':'')} onClick={()=>{if(on){setPreset([])}else{setPreset(s.members);setG(x=>({...x,name:s.name,size:Math.min(MAXSIZE,Math.max(2,s.members.length))}))}}}>{s.name}</button>})}</div>{preset.length>0&&<div className="mute" style={{marginTop:8}}>Only these people will be invited: {preset.join(', ')}</div>}</>}
     <label className="l">Group name</label><input value={g.name} onChange={e=>setG({...g,name:e.target.value})}/>
     <label className="l">How many people?</label>
     <div className="stepper"><button onClick={()=>setSize(g.size-1)} aria-label="Fewer people">−</button><div><b>{g.size}</b><div className="mute">people, up to {MAXSIZE}</div></div><button onClick={()=>setSize(g.size+1)} aria-label="More people">+</button></div>
