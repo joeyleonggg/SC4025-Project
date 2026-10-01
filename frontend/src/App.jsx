@@ -130,7 +130,7 @@ function App(){
  const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist];
  const myHist=histAll.filter(h=>h.orders[uid]||(uid===0&&h.members.includes(USERS0[0].n)));
 
- const say=(t,mid,ms)=>{clearTimeout(toastT.current);setToast({t,mid:!!mid});toastT.current=setTimeout(()=>setToast(''),ms||(mid?2500:2400))};
+ const say=(t,mid,ms)=>{clearTimeout(toastT.current);setToast({t,mid:true});toastT.current=setTimeout(()=>setToast(''),ms||2500)};
  const login=()=>{
   // TODO(backend): POST /auth/cherish {identifier,password} -> token + user. Never keep real passwords client-side.
   const acc=ACCOUNTS.find(a=>a.identifier.toLowerCase()===idf.trim().toLowerCase());
@@ -140,7 +140,7 @@ function App(){
  // note(text, icon, to): `to` = the user ids who receive it (default: everyone currently in the group).
  const note=(t,i='bell',to)=>{
   const rec=[...new Set(to||mem())], id=++nid.current;
-  setNotes(a=>[{id,t,i,to:rec,seen:[]},...a]);
+  setNotes(a=>[{id,t,i,to:rec,seen:[],at:Date.now()},...a]);
   setBanners(b=>[...b,{id,t,i,to:rec}]);setTimeout(()=>setBanners(b=>b.filter(x=>x.id!==id)),4200);
  };
  const upd=(id,f)=>setP(p=>p.map(x=>x.id===id?{...x,...(typeof f==='function'?f(x):f)}:x));
@@ -161,9 +161,10 @@ function App(){
   // TODO(backend): POST /groups {name,deadline,outletId,slot,size,payMode} -> groupId + invite URL. Server enforces max size and slot capacity, and schedules deadline reminders.
   const at=Date.now()+g.win*60000;
   setG(x=>({...x,live:true,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
-  setP(p=>p.map(x=>[1,2,3].includes(x.id)?{...x,in:1}:x));
-  note('Invitations sent for '+g.name,'mail',[0]);note(org.n+' invited you to '+g.name,'mail',[1,2,3]);
-  note('Reminder set: ordering closes at '+tm(at),'clock',[0,1,2,3]); // only the people in this group
+  const inv=Array.from({length:Math.min(g.size,P.length)-1},(_,k)=>k+1); // invite as many people as the group size
+  setP(p=>p.map(x=>inv.includes(x.id)?{...x,in:1}:x));
+  note('Invitations sent for '+g.name,'mail',[0]);note(org.n+' invited you to '+g.name,'mail',inv);
+  note('Reminder set: ordering closes at '+tm(at),'clock',[0,...inv]); // only the people in this group
   setStep(4);say('Group created');
  };
  // A group order that is open or still being collected is never overwritten. A collected one is archived into the order history first.
@@ -471,7 +472,7 @@ function App(){
    {err&&<Ban c="e">{err}</Ban>}
    <label className="l" style={{marginTop:0}}>Payment method</label>
    {METHODS.map(k=><div key={k} className={'opt '+(sel===k?'on':'')} onClick={()=>setSel(k)}><b>{mName(k,uid)}</b>{k==='card'&&<div className="mute">Default payment method</div>}</div>)}
-   <div className="mute" style={{margin:'6px 0 12px'}}>{pm==='group'?'The group total is charged when you send the order to the outlet. Others only see paid or unpaid, never your payment details.':'Nothing is charged now. Your payment method is only charged when the organiser sends the group order to the outlet, and you will get a notification then. Others only see whether your payment is ready, never your payment details.'}</div>
+   <div className="mute" style={{margin:'6px 0 12px'}}>{pm==='group'?'You are charged when you send the order to the outlet.':"You won't be charged until the organiser sends the order."}</div>
    <button className="btn" onClick={()=>pm==='group'?(err?doPay():setSheet({k:'confirmPay'})):doPay()}>{pm==='group'?(err?'Try again':'Review and pay '+$(groupTotal)):'Confirm payment method'}</button>
   </>}
 
@@ -555,7 +556,7 @@ function App(){
   </>}
 
   {screen==='rewards'&&<>
-   <div className="hero" style={{textAlign:'center'}}><div className="mute">Cherish points</div><div className="big">{me.pts}</div><div className="mute">{g.live&&!g.sent&&me.items.length>0?'You will earn about '+pts10(owed(me))+' points on your current order.':'Order with a group to earn points.'}</div></div>
+   <div className="hero" style={{textAlign:'center'}}><div className="mute">Cherish points</div><div className="big">{me.pts}</div></div>
    <div className="mute" style={{marginBottom:8}}>Rewards apply only to your own items. To use one, open My order in a group order and choose View eligible rewards.</div>
    {REWARDS.map(r=>{const okp=me.pts>=r.cost;return <div key={r.id} className={'opt static '+(okp?'':'dis')}><div className="row"><b className="sp">{r.t}</b>{okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.cost} points</div></div>})}
    <div className="h3">Points history</div>
@@ -568,7 +569,7 @@ function App(){
    {[['clock','Saved groups and previous orders',()=>setScr('repeat'),false],['bell','Notifications',()=>{markSeen();setScr('notifs')},hasNew],['gear','Demo controls',()=>setSheet({k:'demo'}),false],['door','Log out',()=>{setIdf('');setPwd('');setLoginErr('');setScr('login')},false]].map(([ic,l,f,dot])=><div className="card row click" key={l} onClick={f}><Icon n={ic}/><b className="sp">{l}</b>{dot&&<i className="dot-inline"/>}<Icon n="chev" s={16}/></div>)}
   </>}
 
-  {screen==='notifs'&&<>{myNotes.length===0&&<div className="card mute">No notifications yet.</div>}{myNotes.map((n,i)=><div className="card row" key={i}><div className="em" style={{width:40,height:40}}><Icon n={n.i}/></div><div className="sp">{n.t}</div></div>)}</>}
+  {screen==='notifs'&&<>{myNotes.length===0&&<div className="card mute">No notifications yet.</div>}{myNotes.map((n,i)=><div className="card row" key={i}><div className="em" style={{width:40,height:40}}><Icon n={n.i}/></div><div className="sp">{n.t}<div className="mute" style={{marginTop:2}}>{fdt(n.at)}</div></div></div>)}</>}
   </div>
 
   <div className="nav">{[['home','Home','home'],['order','Order','menu'],['pay','Pay','wallet'],['rewards','Rewards','rewards'],['more','More','more']].map(([k,l,to])=>
