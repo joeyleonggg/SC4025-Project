@@ -17,7 +17,7 @@ export const OUTLETS = [
   {id:3,name:'Ya Kun – Marina Bay Link Mall',waitMin:5,caps:[3,3,12,12]}];
 export const REWARDS = [
   {id:'r1',title:'$2 off',cost:200,minSpend:5,value:2},
-  {id:'r2',title:'Free kopi',cost:150,minSpend:3,value:1.7},
+  {id:'r2',title:'Free kopi',cost:150,minSpend:3,value:0,free:'Kopi'},
   {id:'r3',title:'$5 off',cost:500,minSpend:10,value:5}];
 const names = ['Alex','Ben','Calvin','Dylan','Eve','Farah','Gareth','Hui Min','Irfan','Jia Wei'];
 const points = [340,260,90,520,150,410,75,230,600,180];

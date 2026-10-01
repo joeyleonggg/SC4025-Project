@@ -73,6 +73,7 @@ function mustGroup(id){ const g = groups.get(String(id)); if (!g) fail(404, 'Gro
 function mustMember(g, user){ const m = memberOf(g, user.id); if (!m) fail(403, 'You are not in this group'); return m; }
 function mustOrganiser(g, user){ if (g.organiserId !== user.id) fail(403, 'Only the organiser can do this'); }
 const open = g => { if (g.cancelled) fail(410, 'This group order was cancelled'); if (g.sent) fail(409, 'The group order was already sent to the outlet'); };
+const freeOf = m => { const r = REWARDS.find(x => x.id === m.rewardId); return r && r.free ? r.free : null; };
 const owed = (g, m) => {
   const r = REWARDS.find(x => x.id === m.rewardId);
   return Math.max(0, round2(lineTotal(m.items) - (r ? r.value : 0)));
@@ -94,7 +95,9 @@ function view(g, user){
       items: (isOrg || m.userId === user.id) ? m.items : undefined,
       paid: (isOrg || m.userId === user.id) ? m.paid : undefined,
       owed: (isOrg || m.userId === user.id) ? owed(g, m) : undefined,
-      rewardId: m.userId === user.id ? m.rewardId : undefined})),
+      rewardId: m.userId === user.id ? m.rewardId : undefined,
+      // the organiser sees who claimed a free item (for distribution); price-deduction vouchers stay private
+      free: (isOrg || m.userId === user.id) ? freeOf(m) || undefined : undefined})),
     groupTotal: isOrg ? round2(g.members.filter(m => m.submitted).reduce((s,m) => s + owed(g,m), 0)) : undefined,
     everyoneReady: isOrg ? g.members.length > 0 && g.members.every(m => m.submitted && (g.payMode === 'sponsor' || m.paid)) : undefined};
 }
@@ -239,8 +242,11 @@ export function consolidated(g, user){
   g.members.filter(m => m.submitted).forEach(m => m.items.forEach(i => {
     const t = totals[i.name] || (totals[i.name] = {name:i.name, qty:0, options:{}});
     t.qty += i.qty; t.options[i.option] = (t.options[i.option] || 0) + i.qty; }));
+  // A free reward (Free kopi) adds one item at $0.00; it is not a price deduction.
+  g.members.filter(m => m.submitted).forEach(m => { const f = freeOf(m); if (!f) return;
+    const t = totals[f] || (totals[f] = {name:f, qty:0, options:{}}); t.qty += 1; t.options['Free reward'] = (t.options['Free reward'] || 0) + 1; });
   return {...view(g, user), consolidated:Object.values(totals),
-    distribution: g.organiserId === user.id ? g.members.filter(m => m.submitted).map(m => ({name:users.get(m.userId).name, items:m.items})) : undefined};
+    distribution: g.organiserId === user.id ? g.members.filter(m => m.submitted).map(m => ({name:users.get(m.userId).name, items:m.items, free:freeOf(m) || undefined})) : undefined};
 }
 export function getOrderStatus(user, id){
   const g = mustGroup(id); mustMember(g, user);

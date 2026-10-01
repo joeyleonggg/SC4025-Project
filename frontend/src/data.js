@@ -19,6 +19,7 @@ export const tm = ms => new Date(ms).toLocaleTimeString([], {hour:'numeric',minu
 // Pickup slots are generated fresh (not baked in at import time) so they always sit ~15/30/45/60 min
 // ahead of whenever the group is actually being created, instead of drifting stale.
 export const SLOT_OFFSETS_MIN = [15, 30, 45, 60];
+export const makeSlotMs = (base = Date.now()) => { const r = Math.ceil(base / 300000) * 300000; return SLOT_OFFSETS_MIN.map(m => r + m * 60000); };
 export const makeSlotTimes = (base = Date.now()) => {
   const rounded = Math.ceil(base / 300000) * 300000; // round up to the next 5-minute mark, for a tidy label
   return SLOT_OFFSETS_MIN.map(m => tm(rounded + m * 60000));
@@ -31,7 +32,7 @@ export const OUTLET_CAPS = [
 
 export const REWARDS = [
  {id:'r1',t:'$2 off',cost:200,min:5,val:2},
- {id:'r2',t:'Free kopi',cost:150,min:3,val:1.7},
+ {id:'r2',t:'Free kopi',cost:150,min:3,val:0,free:'Kopi'}   /* adds a free kopi; no price deduction */,
  {id:'r3',t:'$5 off',cost:500,min:10,val:5}];
 // pmeth = payment method the person selected (nothing is charged yet). paid/paidAmt/paidMeth are only set when the organiser sends the order.
 const U = (id,n,pts,org) => ({id,n,pts,org,in:org?1:0,items:[],sub:0,paid:0,paidAmt:0,paidMeth:'',pmeth:null,rw:null,dirty:0,earned:0,left:0,hist:[]});

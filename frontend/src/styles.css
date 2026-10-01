@@ -207,3 +207,10 @@ button:not(:disabled){cursor:pointer}
 /* pop-up boxes are vertically centred (messages already are; sheets used to sit at the bottom) */
 .sheet-bg{align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
 .sheet{border-radius:24px;max-height:84%;width:100%}
+
+/* demo controls stay at the bottom, like before */
+.sheet-bg.bottom{align-items:flex-end;padding:0}
+.sheet.bottom{border-radius:24px 24px 0 0;max-height:88%}
+/* tidy label / value info card */
+.kv{display:grid;grid-template-columns:96px 1fr;gap:8px 12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:14px;line-height:1.4}
+.kv span{color:var(--mute)}.kv b{font-weight:700;word-break:break-word}
