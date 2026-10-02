@@ -1,9 +1,8 @@
-// BACKEND TODO: see ../TODO_BACKEND.md. All prototype data lives in React state; search this file for TODO(backend).
 import {useState,useEffect,useRef} from 'react';
 import {$,sum,tm,MENU,OUTLET_CAPS,makeSlotTimes,makeSlotMs,REWARDS,HIST0,SAVED0,USERS0,DEMO_ORDERS,MAXSIZE,CARD_LAST4,ACCOUNTS} from './data';
 import './styles.css';
 
-// NOTE: state is local and mocked. Search TODO(backend) for every spot that needs an API (see src/api.js).
+// NOTE: state is local and mocked. Data comes from ./data.js.
 // Open the gear button (top right of the phone) to switch between organiser and participant views and to trigger error states.
 
 const pts10 = v => Math.floor(v*10);
@@ -150,7 +149,6 @@ function App(){
 
  const say=(t)=>{clearTimeout(toastT.current);setToast({t,mid:true});toastT.current=setTimeout(()=>setToast(''),TOAST_MS)};
  const login=()=>{
-  // TODO(backend): POST /auth/cherish {identifier,password} -> token + user. Never keep real passwords client-side.
   const acc=ACCOUNTS.find(a=>a.identifier.toLowerCase()===idf.trim().toLowerCase());
   if(!acc||acc.password!==pwd){setLoginErr('Incorrect email, mobile number or password.');return}
   setLoginErr('');setUid(acc.id);setScr('home');
@@ -168,7 +166,6 @@ function App(){
 
 
  useEffect(()=>{
-  // TODO(backend): the server owns the deadline. It closes ordering, consolidates orders and sends reminders/push notifications; the client only displays the countdown.
   if(!g.live||g.closed||g.sent||g.cancelled)return;
   const msLeft=g.deadlineAt-Date.now(), timers=[];
   if(!g.reminded&&msLeft>0)timers.push(setTimeout(()=>{setG(x=>x.reminded||x.closed||x.sent||x.cancelled?x:{...x,reminded:true});const rec=Pr.current.filter(p=>p.in&&!p.sub).map(p=>p.id);if(rec.length){note('2 minutes left to submit your order','clock',rec);if(rec.includes(uid))say('2 minutes left to order')}},Math.max(0,msLeft-120000)));
@@ -176,7 +173,6 @@ function App(){
   return ()=>timers.forEach(clearTimeout);
  },[g.deadlineAt,g.live,g.closed,g.sent,g.cancelled,g.reminded,uid]);
  const createGroup=()=>{
-  // TODO(backend): POST /groups {name,deadline,outletId,slot,size,payMode} -> groupId + invite URL. Server enforces max size and slot capacity, and schedules deadline reminders.
   const at=Date.now()+g.win*60000;
   setG(x=>({...x,live:true,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
   const inv=P.filter(x=>!x.org&&preset.includes(x.n)).slice(0,g.size-1).map(x=>x.id); // only the saved group's members; a new team starts with just the organiser
@@ -199,70 +195,55 @@ function App(){
   setStep(1);setScr('create');
  };
  const startFrom=s=>{
-  // TODO(backend): GET /saved-groups/:id and POST /groups with the saved members invited again.
   begin(s.name,s.members);
  };
  const newOrder=()=>begin();
  const cancelOrder=()=>{
-  // TODO(backend): POST /groups/:id/cancel (invalidates the invite link, removes orders, notifies members).
   setG(x=>({...x,cancelled:true,closed:true}));note('Group order cancelled','alert');setSheet(null);say('Group order cancelled');
  };
  const join=()=>{
-  // TODO(backend): POST /groups/:id/join {inviteToken}. Reject expired, cancelled or full groups.
   upd(uid,{in:1,left:0});note(me.n+' joined '+g.name,'users');setScr('group');say('You joined '+g.name);
  };
  const leave=()=>{
-  // TODO(backend): POST /groups/:id/leave (removes the participant's order and notifies the organiser).
   upd(uid,{in:0,left:1,sub:0,items:[],paid:0,paidAmt:0,rw:null});note(me.n+' left the group','door',[0]);setScr('group');
  };
  const removeP=p=>{
-  // TODO(backend): DELETE /groups/:id/participants/:userId (organiser only, before final submit).
   upd(p.id,{in:0,sub:0,items:[],paid:0,paidAmt:0,rw:null});note(p.n+' was removed from the group','alert');say(p.n+' removed');
  };
  const addP=p=>{
-  // TODO(backend): POST /groups/:id/invitations {userId} (organiser only). Server checks group size, sends the push notification and returns the updated member list.
   if(members.length>=g.size){say('Group is full ('+members.length+'/'+g.size+')',1);return}
   upd(p.id,{in:1,left:0});note(p.n+' was added to '+g.name,'users',[...mem(),p.id]);
   if(members.length+1>=g.size)say(p.n+' added. Group is now full ('+(members.length+1)+'/'+g.size+')'+(g.size>=MAXSIZE?', the maximum':''),1);else say(p.n+' added to the group');
  };
  const extend=()=>{
-  // TODO(backend): PATCH /groups/:id {deadline} and notify participants.
   const cap=slotAt||Infinity, base=Math.max(g.deadlineAt,Date.now());
   if(base>=cap){say("Can't extend past the collection time ("+g.slot+")");return}
   const at=Math.min(base+15*60000,cap);
   setG(x=>({...x,deadlineAt:at,deadline:tm(at),closed:false,expired:false,reminded:false}));note('Deadline extended to '+tm(at),'clock');say(at===cap?'Deadline extended to '+tm(at)+', the collection time':'Deadline extended to '+tm(at));setSheet(null);
  };
  const closeEarly=()=>{
-  // TODO(backend): POST /groups/:id/close-ordering. Server blocks further order changes.
   setG(x=>({...x,closed:true}));note('Ordering closed early by '+org.n,'lock');say('Ordering closed');
  };
  const saveGroup=()=>{
-  // TODO(backend): POST /saved-groups {name,memberIds}
   if(saved.some(s=>s.name===g.name))return say('Already saved');
   setSaved(s=>[...s,{name:g.name,members:members.map(x=>x.n)}]);say('Group saved');
  };
- // TODO(backend): this is a placeholder address. For a link to open in another browser or phone, the group must live somewhere shared
- // (a server, Firebase/Supabase, or at minimum a BroadcastChannel between tabs of ONE browser) and the app must read the group id/token from the URL.
  const copyLink=()=>{
-  // TODO(backend): use the invite URL returned by POST /groups (expires when the order completes or is cancelled).
   try{navigator.clipboard.writeText('https://yakun.app/together/'+g.gid).catch(()=>{})}catch(e){}
   say('Invite link copied');
  };
  const remind=(p,type)=>{
-  // TODO(backend): POST /groups/:id/remind {userId,type} -> push notification
   note('Reminder sent to '+p.n+': '+type,'clock',[uid]); // confirmation for the organiser only
   note(org.n+' sent you a reminder: '+type,'clock',[p.id]); // the reminder itself goes to that one person
   say('Reminder sent to '+p.n);
  };
  const addToCart=()=>{
-  // TODO(backend): check item availability at the selected outlet (error state: item unavailable).
   const s=sheet,iced=s.temp.startsWith('Iced'),extra=(s.m.set||s.m.dr)&&iced?0.6:0;
   const o=s.m.set?`${s.drink}${s.sw!=='Normal'?', '+s.sw.toLowerCase():''}${iced?', iced':''}`:s.m.dr?`${s.sw}${iced?', iced':', hot'}`:'As served';
   setItems(c=>{const i=c.findIndex(x=>x.id===s.m.id&&x.o===o);if(i>=0)return c.map((x,k)=>k===i?{...x,q:x.q+s.q}:x);return [...c,{id:s.m.id,name:s.m.name,o,q:s.q,p:s.m.price+extra}]});
   setSheet(null);say('Added to your order',1,1500);
  };
  const submit=()=>{
-  // TODO(backend): PUT /groups/:id/orders/me (own order only). Server rejects after deadline/close and re-validates prices, availability and reward.
   if(g.closed)return say('Ordering is closed');
   if(bad(me).length)return say('Remove unavailable items first');
   const first=!me.sub;
@@ -272,7 +253,6 @@ function App(){
   else{setScr('track');say(first?'Order submitted':'Order updated')}
  };
  const send=(o={})=>{
-  // TODO(backend): POST /groups/:id/send -> consolidates orders, sends ONE order to the outlet, locks outlet/time, notifies the group.
   // This is also the moment the order can no longer change, so it's when any applied Cherish reward's points cost is actually spent.
   // Payment methods chosen earlier are charged now, and only now.
   const sponsor=g.pay==='sponsor', at=Date.now();
@@ -297,7 +277,6 @@ function App(){
   send();return true;
  };
  const markCollected=()=>{
-  // TODO(backend): POST /groups/:id/collected -> the organiser confirms handover. Credits each submitted member's earned Cherish points and writes a history entry, since the purchase is now complete.
   setG(x=>({...x,status:'collected'}));
   setP(p=>p.map(x=>{
    if(!(x.in&&x.sub))return x;
@@ -307,7 +286,7 @@ function App(){
   subm.forEach(x=>note('Order collected. '+pts10(owed(x))+' Cherish points credited.','check',[x.id]));
  };
  const doPay=()=>{
-  // TODO(backend): store the chosen payment method only (no charge). The server captures the money when the organiser sends the group order
+  // Stores the chosen payment method only (no charge). Money is charged when the organiser sends the group order
   // (see `send`). Organiser only sees "payment ready" vs "not ready", never card details.
   if(pm==='group'){
    // Organiser paying for everyone: the charge happens as the order is sent.
@@ -328,7 +307,7 @@ function App(){
   const late=who.some(w=>w.id===3);say(who.map(w=>w.n).join(', ')+(late?' submitted. Dylan still needs to choose a payment method.':' submitted.'));
  };
  const advance=()=>{
-  // DEMO ONLY: the outlet updates status; TODO(backend): GET /groups/:id/status (preparing/ready) + push notification.
+  // DEMO ONLY: the outlet updates status.
   if(!g.sent)return say('Send the group order first');
   if(g.status==='preparing'){setG(x=>({...x,status:'ready'}));note('Your group order is ready for collection','star')}else say('Already ready');
  };
@@ -357,7 +336,6 @@ function App(){
    {loginErr&&<div className="loginErr" role="alert" style={{marginTop:14}}>{loginErr}</div>}
    <button className="btn light" style={{marginTop:loginErr?10:16}} onClick={login}>Log in</button>
   </div>
-  <div className="demoBox">Demo accounts (password: kaya1234): alex, ben, calvin, dylan, eve, farah, gareth, huimin, irfan, jiawei, each @yakun.demo</div>
  </div></div>;
 
  return <div className="phone">
@@ -439,7 +417,7 @@ function App(){
   {screen==='group'&&(!g.live?<div className="card"><div className="mute">No group order yet.</div>{isOrg&&<button className="btn" style={{marginTop:10}} onClick={newOrder}>Start Ya Kun Together</button>}</div>:<>
    <div className="card"><div className="row"><b className="sp">{g.name}</b><Tag c={g.sent?'ok':g.closed?'':'w'}>{statusText}</Tag></div>
     {infoRows(false)}</div>
-   {isOrg&&!g.sent&&<div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div>{/* TODO(backend): use the invite URL returned by POST /groups. It expires when the order completes or is cancelled. */}<button className="btn sm" onClick={copyLink}>Copy link</button></div>}
+   {isOrg&&!g.sent&&<div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div><button className="btn sm" onClick={copyLink}>Copy link</button></div>}
    <div className="h3">Members ({members.length}/{g.size})</div>
    {members.map(p=><div className={'card row'+(p.id===uid?' mine':'')} key={p.id}><div className="av">{p.n[0]}</div><div className="sp"><b>{p.n}{p.org?' (organiser)':''}</b>{isOrg&&<div className="mute">{p.sub?'Order submitted':g.closed?'Missed deadline':waitText(p)}</div>}</div>
     {isOrg&&!p.org&&!g.sent&&<button className="btn sm ghost" onClick={()=>setSheet({k:'confirm',title:'Remove '+p.n+'?',msg:`${p.n}'s order will be cleared and they will need a new invite to rejoin.`,label:'Remove',action:()=>{removeP(p);setSheet(null)}})}>Remove</button>}</div>)}
@@ -605,7 +583,6 @@ function App(){
     <div className="row" style={{marginTop:18}}><div className="qty"><button onClick={()=>setSheet({...sheet,q:Math.max(1,sheet.q-1)})}>−</button><b>{sheet.q}</b><button onClick={()=>setSheet({...sheet,q:sheet.q+1})}>+</button></div>
     <button className="btn sp" onClick={addToCart}>Add to order · {$((sheet.m.price+((sheet.m.set||sheet.m.dr)&&sheet.temp.startsWith('Iced')?0.6:0))*sheet.q)}</button></div></>}
    {sheet.k==='rewards'&&<><b style={{fontSize:18}}>Your Cherish rewards</b><div className="mute" style={{marginBottom:10}}>Rewards apply only to your own items.</div>
-    {/* TODO(backend): GET /cherish/rewards. Validate and reserve the reward for this user only. */}
     {REWARDS.map(r=>{const okp=me.pts>=r.cost,okm=sum(me.items)>=r.min,ok=okp&&okm;return <div key={r.id} className={'opt '+(okp?'':'dis')} onClick={()=>{if(!okp)return;if(!okm){say('Spend '+$(r.min)+' or more to use '+r.t,1);return}upd(uid,{rw:r.id});setSheet(null);say(r.t+' applied · − '+r.cost+' points')}}><div className="row"><b className="sp">{r.t}</b>{okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.free?'Adds one free '+r.free+' · ':''}{r.cost} points{okp&&!okm?' · add '+$(r.min-sum(me.items))+' more to your order to use it':''}</div></div>})}</>}
    {sheet.k==='slot'&&<><b style={{fontSize:20}}>Pickup time and group size</b>
     <div className="mute" style={{margin:'6px 0 4px'}}>A smaller group can open up more pickup times.</div>

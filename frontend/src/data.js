@@ -1,7 +1,4 @@
-// TODO(backend): all data below is MOCK. Replace with API calls in src/api.js:
-//   MENU -> GET /menu?outletId=  |  OUTLETS -> GET /outlets?supportsTogether=true&groupSize=
-//   REWARDS -> GET /cherish/rewards  |  HIST0 / SAVED0 -> GET /group-orders/history, GET /saved-groups
-//   USERS0 -> GET /groups/:id (members + statuses; participants must NOT receive other people's payment info)
+// All data below is mock data used by the prototype.
 export const $ = n => '$' + n.toFixed(2);
 export const sum = a => a.reduce((s, i) => s + i.p * i.q, 0);
 export const MAXSIZE = 10;
@@ -41,7 +38,6 @@ export const USERS0 = [U(0,'Alex',340,1),U(1,'Ben',260),U(2,'Calvin',90),U(3,'Dy
 // Demo "card on file" per person, purely cosmetic for the prototype.
 export const CARD_LAST4 = {0:'1111',1:'2222',2:'3333',3:'4444',4:'5555',5:'6666',6:'7777',7:'8888',8:'9999',9:'1212'};
 // Demo Cherish accounts, so the login screen has something real to check against.
-// TODO(backend): replace with POST /auth/cherish; never keep real passwords client-side.
 export const ACCOUNTS = USERS0.map(u => ({id:u.id, identifier:u.n.toLowerCase().replace(/\s+/g,'')+'@yakun.demo', password:'kaya1234'}));
 
 export const DEMO_ORDERS = {
@@ -60,7 +56,6 @@ export const SAVED0 = [
  {name:'Project Team',members:['Alex','Calvin','Eve']}];
 // Previous group orders. Each entry keeps the date/time, outlet, pickup slot and EVERY submitted member's own items,
 // so each person sees "what I ordered" and the organiser sees "who got what".
-// TODO(backend): GET /group-orders/history (participants only receive their own order).
 const ho = (items, rw='') => { const owed = items.reduce((s,i)=>s+i.p*i.q,0); return {items, owed, rw, earn: Math.floor(owed*10)}; };
 const it = (id,name,o,q,p) => ({id,name,o,q,p});
 const tot = orders => Object.values(orders).reduce((s,o)=>s+o.owed,0);
