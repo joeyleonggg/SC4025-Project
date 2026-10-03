@@ -56,13 +56,13 @@ table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;colo
 .dot-inline{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin:0 4px}
 .splash{flex:1;background:var(--red2);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:14px;padding:56px 28px 32px;text-align:center;overflow-y:auto}
 .loginBox{width:100%;text-align:left}
-.ll{display:block;font-size:12px;font-weight:700;opacity:.85;margin:14px 0 6px}
-.li{width:100%;padding:13px 14px;border-radius:12px;border:0;font:600 15px Arial,sans-serif;background:#fff;color:var(--ink)}
+.ll{display:block;font-size:15px;font-weight:700;opacity:.85;margin:14px 0 6px}
+.li{width:100%;padding:17px 16px;border-radius:14px;border:0;font:600 18px Arial,sans-serif;background:#fff;color:var(--ink)}
 .pwRow{position:relative}
-.pwRow .li{padding-right:64px}
-.pwToggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--red);font:700 12px Arial,sans-serif;cursor:pointer;padding:6px}
+.pwRow .li{padding-right:76px}
+.pwToggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--red);font:700 14px Arial,sans-serif;cursor:pointer;padding:6px}
 /* plain text on the dark login background, no white box */
-.loginErr{background:none;color:#FFB3BD;padding:0;font-size:14px;line-height:1.4;font-weight:700;margin-bottom:4px}
+.loginErr{background:none;color:#fff;padding:0;font-size:14px;line-height:1.4;font-weight:700;margin-bottom:4px}
 .loginLinks{display:flex;justify-content:space-between;margin-top:14px}
 .linkLight{background:none;border:0;color:#fff;opacity:.9;font:700 12px Arial,sans-serif;cursor:pointer;padding:4px 0}
 .linkLight:hover{opacity:1;text-decoration:underline}

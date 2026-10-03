@@ -346,7 +346,7 @@ function App(){
    <div className="pwRow"><input className="li" type={showPw?'text':'password'} value={pwd} onChange={e=>setPwd(e.target.value)} placeholder="Password" onKeyDown={e=>e.key==='Enter'&&login()}/>
     <button type="button" className="pwToggle" onClick={()=>setShowPw(s=>!s)} aria-label={showPw?'Hide password':'Show password'}>{showPw?'Hide':'Show'}</button></div>
    <div className="loginErr" role="alert" style={{marginTop:14,minHeight:20,marginBottom:0}}>{loginErr}</div>
-   <button className="btn light" style={{marginTop:10}} onClick={login}>Log in</button>
+   <button className="btn light" style={{marginTop:24}} onClick={login}>Log in</button>
   </div>
  </div></div>;
 
@@ -471,8 +471,8 @@ function App(){
     <div className="card"><div className="row"><span className="sp">Subtotal</span>{$(sum(me.items))}</div>
      {freeOf(me)&&<div className="row"><span className="sp">Free {freeOf(me).free} (reward)</span>{$(0)}</div>}
      {rw(me)&&sum(me.items)-owed(me)>0&&<div className="row voucher"><span className="sp">{rw(me).t}</span>− {$(sum(me.items)-owed(me))}</div>}
-     <div className="row" style={{marginTop:6}}><b className="sp">{g.pay==='sponsor'?org.n+' is paying for you':'You pay'}</b><b>{g.pay==='sponsor'?$(0):$(owed(me))}</b></div>
-     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to '+org.n+'.':<>You'll earn about <b>{earnOf(me)} Cherish points</b>{g.pay==='sponsor'?' for the whole group order':''} when the group order is collected.</>}</div></div>
+     <div className="row" style={{marginTop:6}}><b className="sp">{g.pay==='sponsor'&&!isOrg?org.n+' is paying for you':'You pay'}</b><b>{g.pay==='sponsor'&&!isOrg?$(0):$(owed(me))}</b></div>
+     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':<>You'll earn about <b>{g.pay==='sponsor'?pts10(groupTotal+(me.sub?0:owed(me))):earnOf(me)} Cherish points</b>{g.pay==='sponsor'?' for the whole group order':''} when the group order is collected.</>}</div></div>
     {!!me.sub&&g.pay==='individual'&&owed(me)>0&&!g.sent&&(me.pmeth?<><Ban c="k">Payment method: {mName(me.pmeth,uid)}. You will be charged {$(owed(me))} only when {isOrg?'you send':'the organiser sends'} the group order.</Ban><button className="link" onClick={()=>goPay('me')}>Change payment method</button></>:<button className="btn" style={{marginTop:10}} onClick={()=>goPay('me')}>Choose payment method</button>)}
     {g.sent&&!!me.paid&&me.paidAmt>0&&<Ban c="k">Charged {$(me.paidAmt)} to {me.paidMeth}</Ban>}
     {editable&&<div className="sticky"><button className="btn" disabled={bad(me).length>0} onClick={submit}>{me.sub?'Update my order':'Submit my order'}</button></div>}
