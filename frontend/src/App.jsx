@@ -270,7 +270,7 @@ function App(){
    return r?{...base,pts:x.pts-r.cost,hist:[{amt:-r.cost,note:r.t+' reward',at}, ...x.hist]}:base;
   }));
   note('Group order submitted. Collect at '+g.slot+', '+outlet.n,'receipt');
-  subm.forEach(x=>{const amt=amtOf(x);note(amt>0?'You were charged '+$(amt)+' ('+mName(methOf(x),x.id)+') for '+g.name:sponsor?org.n+' paid for your order. Nothing to pay.':'Nothing was charged: your order was fully covered.','card',[x.id])});
+  subm.forEach(x=>{const amt=amtOf(x);note(amt>0?'You were charged '+$(amt)+' ('+mName(methOf(x),x.id)+') for '+g.name:sponsor?org.n+' paid for your order.':'Nothing was charged: your order was fully covered.','card',[x.id])});
  };
  // Organiser taps "Send": if a charge would be declined (demo switch), the order is NOT sent and that person is asked for another method.
  const trySend=()=>{
