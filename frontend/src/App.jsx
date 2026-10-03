@@ -210,10 +210,10 @@ function App(){
   upd(uid,{in:1,left:0});note(me.n+' joined '+g.name,'users');setScr('group');say('You joined '+g.name);
  };
  const leave=()=>{
-  upd(uid,{in:0,left:1,sub:0,items:[],paid:0,paidAmt:0,rw:null});note(me.n+' left the group','door',[0]);setScr('group');
+  upd(uid,{in:0,left:1,sub:0,items:[],paid:0,paidAmt:0,rw:null,pmeth:null,payFail:0});note(me.n+' left the group','door',[0]);setScr('group');
  };
  const removeP=p=>{
-  upd(p.id,{in:0,sub:0,items:[],paid:0,paidAmt:0,rw:null});note(p.n+' was removed from the group','alert');say(p.n+' removed');
+  upd(p.id,{in:0,sub:0,items:[],paid:0,paidAmt:0,rw:null,pmeth:null,payFail:0});note(p.n+' was removed from the group','alert');say(p.n+' removed');
  };
  const addP=p=>{
   if(members.length>=g.size){say('Group is full ('+members.length+'/'+g.size+')',1);return}
@@ -305,6 +305,7 @@ function App(){
    setErr('');setReceipt({amt:groupTotal,at:Date.now(),items:subm.flatMap(p=>p.items),meth:mName(sel,uid)});
    upd(uid,{pmeth:sel,payFail:0});send({meth:sel});setScr('paid');return;
   }
+  if(me.payFail&&uid!==0)note(me.n+' chose a new payment method. The order can now be sent.','check',[0]);
   upd(uid,{pmeth:sel,payFail:0});
   setScr('track');say('Payment method saved. You will only be charged when the order is sent.');
  };
@@ -510,8 +511,7 @@ function App(){
        {p.id!==uid&&!g.closed&&!p.sub&&!p.org&&<button className="link" onClick={e=>{e.stopPropagation();remind(p,'order before '+g.deadline)}}>Remind</button>}{p.id!==uid&&!g.sent&&needsMethod(p)&&<button className="link" onClick={e=>{e.stopPropagation();remind(p,'choose a payment method before the order is sent')}}>Remind</button>}</div>
       {open===p.id&&<div className="expand">{p.items.length?p.items.map((i,k)=><div className="row" key={k}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}</span>× {i.q}</div>):<div className="mute">No items yet</div>}{!!p.sub&&freeOf(p)&&<div className="row"><span className="sp">{freeOf(p).free}<div className="mute">Free reward</div></span>× 1</div>}</div>}</div>)}
    </>}
-   {!g.sent&&members.filter(p=>p.payFail).map(p=><Ban key={'pf'+p.id} c="e">{p.id===uid?'Your payment was declined. The order was not sent. Choose another payment method.':'Payment declined for '+p.n+'. The order was not sent. '+p.n+' needs to choose another payment method.'}</Ban>)}
-   {!g.sent&&!!me.payFail&&<button className="btn ghost" style={{marginBottom:12}} onClick={()=>goPay('me')}>Choose payment method</button>}
+   {!g.sent&&members.filter(p=>p.payFail&&p.id!==uid).map(p=><Ban key={'pf'+p.id} c="e">{'Payment declined for '+p.n+'. The order was not sent. '+p.n+' needs to choose another payment method.'}</Ban>)}
    {g.sent?<button className="btn" onClick={()=>setScr('done')}>View collection details</button>:isOrg&&<>
     {!g.closed&&<button className="btn ghost" style={{marginBottom:10}} onClick={()=>setSheet({k:'confirm',title:'Close ordering now?',msg:"Nobody will be able to submit or change an order after this, even if the deadline hasn't passed.",label:'Close ordering',action:()=>{closeEarly();setSheet(null)}})}>Close ordering early</button>}
     <button className="btn" disabled={!canSend} onClick={()=>{if(g.pay==='sponsor'){goPay('group')}else if(trySend())setScr('done')}}>{g.pay==='sponsor'?'Pay '+$(groupTotal)+' and send to outlet':'Send group order to outlet'}</button>
