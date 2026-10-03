@@ -344,8 +344,8 @@ function App(){
    <label className="ll">Password</label>
    <div className="pwRow"><input className="li" type={showPw?'text':'password'} value={pwd} onChange={e=>setPwd(e.target.value)} placeholder="Password" onKeyDown={e=>e.key==='Enter'&&login()}/>
     <button type="button" className="pwToggle" onClick={()=>setShowPw(s=>!s)} aria-label={showPw?'Hide password':'Show password'}>{showPw?'Hide':'Show'}</button></div>
-   {loginErr&&<div className="loginErr" role="alert" style={{marginTop:14}}>{loginErr}</div>}
-   <button className="btn light" style={{marginTop:loginErr?10:16}} onClick={login}>Log in</button>
+   <div className="loginErr" role="alert" style={{marginTop:14,minHeight:20,marginBottom:0}}>{loginErr}</div>
+   <button className="btn light" style={{marginTop:10}} onClick={login}>Log in</button>
   </div>
  </div></div>;
 
