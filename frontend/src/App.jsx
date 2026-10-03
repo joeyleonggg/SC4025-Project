@@ -301,7 +301,7 @@ function App(){
   // (see `send`). Organiser only sees "payment ready" vs "not ready", never card details.
   if(pm==='group'){
    // Organiser paying for everyone: the charge happens as the order is sent.
-   if(g.failFor.includes(0)){setG(x=>({...x,failFor:x.failFor.filter(i=>i!==0)}));setErr('Payment failed. The payment was declined. Try another method or try again.');return}
+   if(g.failFor.includes(0)){setG(x=>({...x,failFor:x.failFor.filter(i=>i!==0)}));setErr('Your payment was declined and the order was not sent. Please try again.');return}
    setErr('');setReceipt({amt:groupTotal,at:Date.now(),items:subm.flatMap(p=>p.items),meth:mName(sel,uid)});
    upd(uid,{pmeth:sel,payFail:0});send({meth:sel});setScr('paid');return;
   }
@@ -472,7 +472,7 @@ function App(){
      {freeOf(me)&&<div className="row"><span className="sp">Free {freeOf(me).free} (reward)</span>{$(0)}</div>}
      {rw(me)&&sum(me.items)-owed(me)>0&&<div className="row voucher"><span className="sp">{rw(me).t}</span>− {$(sum(me.items)-owed(me))}</div>}
      <div className="row" style={{marginTop:6}}><b className="sp">{g.pay==='sponsor'&&!isOrg?org.n+' is paying for you':'You pay'}</b><b>{g.pay==='sponsor'&&!isOrg?$(0):$(owed(me))}</b></div>
-     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':<>You'll earn about <b>{g.pay==='sponsor'?pts10(groupTotal+(me.sub?0:owed(me))):earnOf(me)} Cherish points</b>{g.pay==='sponsor'?' for the whole group order':''} when the group order is collected.</>}</div></div>
+     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':g.pay==='sponsor'?<>You'll earn about <b>{pts10(groupTotal+(me.sub?0:owed(me)))} Cherish points</b>.</>:<>You'll earn about <b>{earnOf(me)} Cherish points</b> when the group order is collected.</>}</div></div>
     {!!me.sub&&g.pay==='individual'&&owed(me)>0&&!g.sent&&(me.pmeth?<><Ban c="k">Payment method: {mName(me.pmeth,uid)}. You will be charged {$(owed(me))} only when {isOrg?'you send':'the organiser sends'} the group order.</Ban><button className="link" onClick={()=>goPay('me')}>Change payment method</button></>:<button className="btn" style={{marginTop:10}} onClick={()=>goPay('me')}>Choose payment method</button>)}
     {g.sent&&!!me.paid&&me.paidAmt>0&&<Ban c="k">Charged {$(me.paidAmt)} to {me.paidMeth}</Ban>}
     {editable&&<div className="sticky"><button className="btn" disabled={bad(me).length>0} onClick={submit}>{me.sub?'Update my order':'Submit my order'}</button></div>}
