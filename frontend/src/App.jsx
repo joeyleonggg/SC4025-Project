@@ -114,7 +114,7 @@ function App(){
  const earners=g.pay==='sponsor'?members.filter(p=>p.org):subm;
  const declined=!!me.payFail&&!g.sent;
  // Nobody is charged until the order is sent. "Ready to pay" just means a payment method has been chosen.
- const needsMethod=p=>g.pay==='individual'&&p.sub&&owed(p)>0&&!p.pmeth;
+ const needsMethod=p=>g.pay==='individual'&&!!p.sub&&owed(p)>0&&!p.pmeth;
  const unpaid=subm.filter(needsMethod);
  const slotOk=t=>outlet.slots[t]>=g.size&&!(g.slotGone&&t===g.slot&&g.sent===false&&g.live);
  const bad=p=>p.items.filter(i=>g.sold.includes(i.id));
@@ -505,13 +505,13 @@ function App(){
     <div className="card"><div className="mute">Total group order</div><div className="big">{$(groupTotal)}</div><div className="mute">{members.length} joined · {subm.length} submitted · {members.length-subm.length} not submitted</div></div>
     <div className="h3">People ({members.length})</div>
      {members.map(p=><div className={'card click'+(p.id===uid?' mine':'')} key={p.id} onClick={()=>setOpen(open===p.id?null:p.id)}>
-      <div className="row"><div className="av">{p.n[0]}</div><div className="sp"><b>{p.n}{p.org?' (organiser)':''}</b><div className="mute">{p.sub?$(owed(p))+' · '+(n=>n+' item'+(n===1?'':'s'))(p.items.reduce((s,i)=>s+i.q,0)):g.closed?'Missed the deadline':waitText(p)}</div>{p.sub&&freeOf(p)&&<div className="mute">+ Free {freeOf(p).free} (reward)</div>}</div><Icon n="chev" s={16}/></div>
+      <div className="row"><div className="av">{p.n[0]}</div><div className="sp"><b>{p.n}{p.org?' (organiser)':''}</b><div className="mute">{p.sub?$(owed(p))+' · '+(n=>n+' item'+(n===1?'':'s'))(p.items.reduce((s,i)=>s+i.q,0)):g.closed?'Missed the deadline':waitText(p)}</div>{!!p.sub&&freeOf(p)&&<div className="mute">+ Free {freeOf(p).free} (reward)</div>}</div><Icon n="chev" s={16}/></div>
       <div className="row" style={{marginTop:12,flexWrap:'wrap'}}>{p.sub?<Tag c="ok">Submitted</Tag>:g.closed?<Tag c="w">Missed</Tag>:<Tag>{p.items.length?'Ordering':'Not ordered yet'}</Tag>}{pstat(p)}<span className="sp"/>
        {p.id!==uid&&!g.closed&&!p.sub&&!p.org&&<button className="link" onClick={e=>{e.stopPropagation();remind(p,'order before '+g.deadline)}}>Remind</button>}{p.id!==uid&&!g.sent&&needsMethod(p)&&<button className="link" onClick={e=>{e.stopPropagation();remind(p,'choose a payment method before the order is sent')}}>Remind</button>}</div>
-      {open===p.id&&<div className="expand">{p.items.length?p.items.map((i,k)=><div className="row" key={k}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}</span>× {i.q}</div>):<div className="mute">No items yet</div>}{p.sub&&freeOf(p)&&<div className="row"><span className="sp">{freeOf(p).free}<div className="mute">Free reward</div></span>× 1</div>}</div>}</div>)}
+      {open===p.id&&<div className="expand">{p.items.length?p.items.map((i,k)=><div className="row" key={k}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}</span>× {i.q}</div>):<div className="mute">No items yet</div>}{!!p.sub&&freeOf(p)&&<div className="row"><span className="sp">{freeOf(p).free}<div className="mute">Free reward</div></span>× 1</div>}</div>}</div>)}
    </>}
    {!g.sent&&members.filter(p=>p.payFail).map(p=><Ban key={'pf'+p.id} c="e">{p.id===uid?'Your payment was declined. The order was not sent. Choose another payment method.':'Payment declined for '+p.n+'. The order was not sent. '+p.n+' needs to choose another payment method.'}</Ban>)}
-   {!g.sent&&me.payFail&&<button className="btn ghost" style={{marginBottom:12}} onClick={()=>goPay('me')}>Choose payment method</button>}
+   {!g.sent&&!!me.payFail&&<button className="btn ghost" style={{marginBottom:12}} onClick={()=>goPay('me')}>Choose payment method</button>}
    {g.sent?<button className="btn" onClick={()=>setScr('done')}>View collection details</button>:isOrg&&<>
     {!g.closed&&<button className="btn ghost" style={{marginBottom:10}} onClick={()=>setSheet({k:'confirm',title:'Close ordering now?',msg:"Nobody will be able to submit or change an order after this, even if the deadline hasn't passed.",label:'Close ordering',action:()=>{closeEarly();setSheet(null)}})}>Close ordering early</button>}
     <button className="btn" disabled={!canSend} onClick={()=>{if(g.pay==='sponsor'){goPay('group')}else if(trySend())setScr('done')}}>{g.pay==='sponsor'?'Pay '+$(groupTotal)+' and send to outlet':'Send group order to outlet'}</button>
