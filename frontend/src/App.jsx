@@ -65,7 +65,8 @@ const freeTxt = p => freeOf(p) ? 'Free ' + freeOf(p).free + ' (reward)' : '';
 const lines = p => p.items.map(itemLine).concat(freeOf(p) ? [freeTxt(p)] : []).join(' + ');
 // "Still choosing" only fits someone who already has items; a person who was just added has not started yet.
 const waitText = p => p.items.length ? 'Still choosing' : 'Not ordered yet';
-const blank = p => ({...p,items:[],sub:0,paid:0,paidAmt:0,paidMeth:'',pmeth:null,payFail:0,rw:null,dirty:0,earned:0,left:0,in:p.org?1:0});
+const blank = p => ({...p,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:null,payFail:0,rw:null,earned:0,left:0,in:p.org?1:0});
+const submitted = p => p.sub ? {...p,...p.sub} : p;
 const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[]};
 // n = how many group orders this session has already finished, so every new group gets its own order id and collection number.
 const slotSet = () => { const ms = makeSlotMs(); return {slotMs: ms, slotTimes: ms.map(tm)}; };
@@ -97,12 +98,14 @@ function App(){
  const [banners,setBanners]=useState([]);
  const nid=useRef(0), toastT=useRef(null), Pr=useRef(null);
 
- const isOrg=uid===0, me=P[uid], org=P[0];
+ const isOrg=uid===0, draft=P[uid], me=submitted(draft), org=P[0];
  const outlet={n:OUTLET_CAPS[g.oi].n,w:OUTLET_CAPS[g.oi].w,slots:Object.fromEntries(g.slotTimes.map((t,i)=>[t,OUTLET_CAPS[g.oi].caps[i]]))};
- const slotAt=g.slotMs[g.slotTimes.indexOf(g.slot)]||0;   // collection time in ms; the deadline can never be later than this
- const slotValid=!!g.slot&&outlet.slots[g.slot]>=g.size&&!g.slotGone;
+ const timeOfSlot=t=>g.slotMs[g.slotTimes.indexOf(t)]||0;
+ const slotAt=timeOfSlot(g.slot);
+ const slotFits=t=>outlet.slots[t]>=g.size&&!(g.slotGone&&t===g.slot);
+ const slotAvailable=(t,now)=>slotFits(t)&&timeOfSlot(t)>Math.max(now,g.deadlineAt);
  Pr.current=P;
- const members=P.filter(p=>p.in), subm=members.filter(p=>p.sub);
+ const members=P.filter(p=>p.in).map(submitted), subm=members.filter(p=>p.sub);
  const rw=p=>REWARDS.find(r=>r.id===p.rw);
  // Points are only spent when the group order is sent (see `send`), so every screen shows the real balance until then.
  const avail=me.pts;
@@ -116,13 +119,26 @@ function App(){
  // Nobody is charged until the order is sent. "Ready to pay" just means a payment method has been chosen.
  const needsMethod=p=>g.pay==='individual'&&!!p.sub&&owed(p)>0&&!p.pmeth;
  const unpaid=subm.filter(needsMethod);
- const slotOk=t=>outlet.slots[t]>=g.size&&!(g.slotGone&&t===g.slot&&g.sent===false&&g.live);
  const bad=p=>p.items.filter(i=>g.sold.includes(i.id));
- const editable=g.live&&me.in&&!g.closed&&!g.sent;
- const payReady=g.pay==='sponsor'||unpaid.length===0;
+ const pending=g.live&&!g.sent&&!g.cancelled;
+ const orderingOpen=()=>pending&&!g.closed&&Date.now()<g.deadlineAt;
+ const canEdit=()=>me.in&&orderingOpen();
+ const editable=canEdit();
+ const cart=editable?draft:me;
+ const dirty=editable&&!!me.sub&&(draft.items!==me.items||draft.rw!==me.rw);
  const everyone=members.length>0&&members.every(p=>p.sub&&!needsMethod(p));
- const canSend=g.closed&&!g.sent&&subm.length>0&&payReady&&slotValid;
- const why=!g.closed?'Close ordering first.':subm.length===0?'No orders have been submitted.':!payReady?unpaid.length+' payment method(s) still to be chosen.':!slotValid?'Choose a pickup time that fits your group size.':'';
+ const unavailable=subm.filter(p=>bad(p).length);
+ const sendBlock=now=>{
+  if(g.cancelled)return 'This group order was cancelled.';
+  if(!isOrg||!pending)return 'There is no group order to send.';
+  if(!g.closed)return 'Close ordering first.';
+  if(!subm.length)return 'No orders have been submitted.';
+  if(!slotAvailable(g.slot,now))return 'Choose an available future pickup time that fits your group size.';
+  if(unavailable.length)return 'Unavailable items in submitted orders for '+unavailable.map(p=>p.n).join(', ')+'. Extend ordering so they can update their orders.';
+  if(unpaid.length)return unpaid.length+' payment method(s) still to be chosen.';
+  return '';
+ };
+ const why=sendBlock(Date.now()), canSend=!why;
  const infoRows=withMembers=><div className="kv">
   <span>Organiser</span><b>{org.n}</b>
   <span>Deadline</span><b>{g.deadline}</b>
@@ -165,7 +181,15 @@ function App(){
   setBanners(b=>[...b,{id,t,i,to:rec}]);setTimeout(()=>setBanners(b=>b.filter(x=>x.id!==id)),4200);
  };
  const upd=(id,f)=>setP(p=>p.map(x=>x.id===id?{...x,...(typeof f==='function'?f(x):f)}:x));
- const setItems=f=>upd(uid,x=>{const it=f(x.items),r=REWARDS.find(r=>r.id===x.rw),drop=r&&sum(it)<r.min,newRw=drop?null:x.rw;return {items:it,rw:newRw,dirty:x.sub?1:0}});
+ const setItems=f=>{
+  if(!canEdit())return;
+  upd(uid,x=>{const items=f(x.items),r=rw(x);return {items,rw:r&&sum(items)<r.min?null:x.rw}});
+ };
+ const setReward=id=>{
+  if(!canEdit())return say('Ordering is closed');
+  upd(uid,{rw:id});setSheet(null);
+  if(id)say(REWARDS.find(r=>r.id===id).t+' applied');
+ };
  const setSize=n=>{const min=Math.max(2,preset.length);if(n>MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`);n=MAXSIZE}if(n<min&&preset.length>2)say(`${preset.length} people are in this saved group`);setG(x=>({...x,size:Math.max(min,n)}))};
  const setOutlet=i=>setG(x=>{const idx=x.slotTimes.indexOf(x.slot),ok=idx>=0&&OUTLET_CAPS[i].caps[idx]>=x.size;return {...x,oi:i,slot:ok?x.slot:''}});
 
@@ -178,7 +202,12 @@ function App(){
   return ()=>timers.forEach(clearTimeout);
  },[g.deadlineAt,g.live,g.closed,g.sent,g.cancelled,g.reminded,uid]);
  const createGroup=()=>{
-  const at=Date.now()+g.win*60000;
+  if(!isOrg||g.live)return;
+  const now=Date.now(), at=now+g.win*60000;
+  if(!slotFits(g.slot)||now+5*60000>=slotAt){
+   setG(x=>({...x,...slotSet(),slot:''}));setStep(2);return say('Choose a later pickup time');
+  }
+  if(at>=slotAt)return say('Choose a shorter ordering time or a later pickup');
   setG(x=>({...x,live:true,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
   const inv=P.filter(x=>!x.org&&preset.includes(x.n)).slice(0,g.size-1).map(x=>x.id); // only the saved group's members; a new team starts with just the organiser
   setP(p=>p.map(x=>inv.includes(x.id)?{...x,in:1}:x));
@@ -204,29 +233,39 @@ function App(){
  };
  const newOrder=()=>begin();
  const cancelOrder=()=>{
-  setG(x=>({...x,cancelled:true,closed:true}));note('Group order cancelled','alert');setSheet(null);say('Group order cancelled');
+  if(!isOrg||!pending)return;
+  setG(x=>({...x,cancelled:true,closed:true,expired:false}));
+  setP(p=>p.map(x=>x.in?{...blank(x),in:1}:x));
+  note('Group order cancelled','alert');setSheet(null);setScr('track');say('Group order cancelled');
  };
  const join=()=>{
+  if(invState!=='valid'||!pending||me.in)return;
   upd(uid,{in:1,left:0});note(me.n+' joined '+g.name,'users');setScr('group');say('You joined '+g.name);
  };
  const leave=()=>{
-  upd(uid,{in:0,left:1,sub:0,items:[],paid:0,paidAmt:0,rw:null,pmeth:null,payFail:0});note(me.n+' left the group','door',[0]);setScr('group');
+  if(!pending)return;
+  upd(uid,{in:0,left:1,sub:null,items:[],paid:0,paidAmt:0,rw:null,pmeth:null,payFail:0});note(me.n+' left the group','door',[0]);setScr('group');
  };
  const removeP=p=>{
-  upd(p.id,{in:0,sub:0,items:[],paid:0,paidAmt:0,rw:null,pmeth:null,payFail:0});note(p.n+' was removed from the group','alert');say(p.n+' removed');
+  if(!isOrg||!pending)return;
+  upd(p.id,{in:0,sub:null,items:[],paid:0,paidAmt:0,rw:null,pmeth:null,payFail:0});note(p.n+' was removed from the group','alert');say(p.n+' removed');
  };
  const addP=p=>{
+  if(!isOrg||!orderingOpen())return;
   if(members.length>=g.size){say('Group is full ('+members.length+'/'+g.size+')',1);return}
   upd(p.id,{in:1,left:0});note(p.n+' was added to '+g.name,'users',[...mem(),p.id]);
   if(members.length+1>=g.size)say(p.n+' added. Group is now full ('+(members.length+1)+'/'+g.size+')'+(g.size>=MAXSIZE?', the maximum':''),1);else say(p.n+' added to the group');
  };
+ const extensionLimit=slotAt-60000;
  const extend=()=>{
-  const cap=slotAt||Infinity, base=Math.max(g.deadlineAt,Date.now());
-  if(base>=cap){say("Can't extend past the collection time ("+g.slot+")");return}
+  if(!isOrg||!pending)return;
+  const cap=extensionLimit, base=Math.max(g.deadlineAt,Date.now());
+  if(base>=cap){say('Choose a later pickup time before extending');return}
   const at=Math.min(base+15*60000,cap);
-  setG(x=>({...x,deadlineAt:at,deadline:tm(at),closed:false,expired:false,reminded:false}));note('Deadline extended to '+tm(at),'clock');say(at===cap?'Deadline extended to '+tm(at)+', the collection time':'Deadline extended to '+tm(at));setSheet(null);
+  setG(x=>({...x,deadlineAt:at,deadline:tm(at),closed:false,expired:false,reminded:false}));note('Deadline extended to '+tm(at),'clock');say('Deadline extended to '+tm(at));setSheet(null);
  };
  const closeEarly=()=>{
+  if(!isOrg||!orderingOpen())return;
   setG(x=>({...x,closed:true}));note('Ordering closed early by '+org.n,'lock');say('Ordering closed');
  };
  const saveGroup=()=>{
@@ -243,37 +282,57 @@ function App(){
   say('Reminder sent to '+p.n);
  };
  const addToCart=()=>{
+  if(!canEdit())return say('Ordering is closed');
+  if(g.sold.includes(sheet.m.id))return say('This item is unavailable');
   const s=sheet,iced=s.temp.startsWith('Iced'),extra=(s.m.set||s.m.dr)&&iced?0.6:0;
   const o=s.m.set?`${s.drink}${s.sw!=='Normal'?', '+s.sw.toLowerCase():''}${iced?', iced':''}`:s.m.dr?`${s.sw}${iced?', iced':', hot'}`:'As served';
   setItems(c=>{const i=c.findIndex(x=>x.id===s.m.id&&x.o===o);if(i>=0)return c.map((x,k)=>k===i?{...x,q:x.q+s.q}:x);return [...c,{id:s.m.id,name:s.m.name,o,q:s.q,p:s.m.price+extra}]});
   setSheet(null);say('Added to your order',1,1500);
  };
  const submit=()=>{
-  if(g.closed)return say('Ordering is closed');
-  if(bad(me).length)return say('Remove unavailable items first');
+  if(!canEdit())return say('Ordering is closed');
+  if(bad(draft).length)return say('Remove unavailable items first');
+  if(!draft.items.length){
+   if(!me.sub)return;
+   upd(uid,{sub:null,payFail:0});
+   if(!isOrg)note(me.n+' withdrew their order','alert',[0]);
+   setScr('track');say('Order withdrawn');return;
+  }
   const first=!me.sub;
-  upd(uid,{sub:1,dirty:0}); // nothing is paid here; the charge happens when the organiser sends the order
+  // Cart edits replace the array and reward ID, leaving this submitted snapshot intact.
+  upd(uid,{sub:{items:draft.items,rw:draft.rw}});
   if(uid!==0)note(me.n+(first?' submitted':' updated')+' an order','check',[0]);
-  if(first&&g.pay==='individual'&&owed(me)>0&&!me.pmeth){goPay('me')}
+  if(g.pay==='individual'&&owed(draft)>0&&!me.pmeth){goPay('me')}
   else{setScr('track');say(first?'Order submitted':'Order updated')}
  };
- const send=(o={})=>{
+ const send=(at,meth)=>{
   // This is also the moment the order can no longer change, so it's when any applied Cherish reward's points cost is actually spent.
   // Payment methods chosen earlier are charged now, and only now.
-  const sponsor=g.pay==='sponsor', at=Date.now();
+  const sponsor=g.pay==='sponsor';
   const amtOf=x=>sponsor?(x.org?groupTotal:0):owed(x);
-  const methOf=x=>x.org&&o.meth?o.meth:(x.pmeth||'card');
+  const methOf=x=>x.org&&meth?meth:(x.pmeth||'card');
   setG(x=>({...x,sent:true,sentAt:at,status:'preparing'}));
   setP(p=>p.map(x=>{
    if(!(x.in&&x.sub))return x;
-   const r=rw(x), amt=amtOf(x), base={...x,paid:1,paidAmt:amt,paidMeth:amt>0?mName(methOf(x),x.id):'',pmeth:x.pmeth||(amt>0?methOf(x):null)};
+   const order=submitted(x), r=rw(order), amt=amtOf(order);
+   const base={...x,paid:1,paidAmt:amt,paidMeth:amt>0?mName(methOf(x),x.id):'',pmeth:x.pmeth||(amt>0?methOf(x):null)};
    return r?{...base,pts:x.pts-r.cost,hist:[{amt:-r.cost,note:r.t+' reward',at}, ...x.hist]}:base;
   }));
   note('Group order submitted. Collect at '+g.slot+', '+outlet.n,'receipt');
   subm.forEach(x=>{const amt=amtOf(x);note(amt>0?'You were charged '+$(amt)+' ('+mName(methOf(x),x.id)+') for '+g.name:sponsor?org.n+' paid for your order.':'Nothing was charged: your order was fully covered.','card',[x.id])});
  };
  // Organiser taps "Send": if a charge would be declined (demo switch), the order is NOT sent and that person is asked for another method.
- const trySend=()=>{
+ const trySend=meth=>{
+  const now=Date.now(), reason=sendBlock(now);
+  if(reason){setScr('track');say(reason);return false}
+  if(g.pay==='sponsor'){
+   if(groupTotal>0&&g.failFor.includes(0)){
+    setG(x=>({...x,failFor:x.failFor.filter(i=>i!==0)}));
+    setErr('Your payment was declined and the order was not sent. Please try again.');
+    return false;
+   }
+   send(now,meth);return true;
+  }
   // DEMO: the person(s) chosen under Demo controls have their charge declined at the moment the organiser sends.
   // The order is NOT sent; that person (organiser or colleague) must choose another payment method.
   const v=subm.find(p=>g.failFor.includes(p.id)&&owed(p)>0&&p.pmeth);
@@ -284,27 +343,28 @@ function App(){
    else{note('Your payment was declined. Choose another payment method so the order can be sent.','alert',[v.id]);note('Payment declined for '+v.n+'. The order was not sent.','alert',[0]);say('Payment declined for '+v.n+'. Order not sent.',1,2200)}
    return false;
   }
-  send();return true;
+  send(now);return true;
  };
  const markCollected=()=>{
   setG(x=>({...x,status:'collected'}));
   const ids=earners.map(x=>x.id);
   setP(p=>p.map(x=>{
    if(!ids.includes(x.id))return x;
-   const earn=earnOf(x);
+   const earn=earnOf(submitted(x));
    return {...x,earned:earn,pts:x.pts+earn,hist:[{amt:earn,note:'Ya Kun Together · '+g.name,at:Date.now()},...x.hist]};
   }));
-  [...new Set([...subm.map(x=>x.id),...ids])].forEach(id=>{const x=P[id],e=ids.includes(id)?earnOf(x):0;note(e>0?'Order collected. '+e+' Cherish points credited.':'Order collected.','check',[id])});
+  [...new Set([...subm.map(x=>x.id),...ids])].forEach(id=>{const e=ids.includes(id)?earnOf(submitted(P[id])):0;note(e>0?'Order collected. '+e+' Cherish points credited.':'Order collected.','check',[id])});
  };
  const doPay=()=>{
   // Stores the chosen payment method only (no charge). Money is charged when the organiser sends the group order
   // (see `send`). Organiser only sees "payment ready" vs "not ready", never card details.
   if(pm==='group'){
    // Organiser paying for everyone: the charge happens as the order is sent.
-   if(g.failFor.includes(0)){setG(x=>({...x,failFor:x.failFor.filter(i=>i!==0)}));setErr('Your payment was declined and the order was not sent. Please try again.');return}
+   if(!trySend(sel))return;
    setErr('');setReceipt({amt:groupTotal,at:Date.now(),items:subm.flatMap(p=>p.items),meth:mName(sel,uid)});
-   upd(uid,{pmeth:sel,payFail:0});send({meth:sel});setScr('paid');return;
+   upd(uid,{pmeth:sel,payFail:0});setScr('paid');return;
   }
+  if(!pending||!me.in||!me.sub)return;
   if(me.payFail&&uid!==0)note(me.n+' chose a new payment method. The order can now be sent.','check',[0]);
   upd(uid,{pmeth:sel,payFail:0});
   setScr('track');say('Payment method saved. You will only be charged when the order is sent.');
@@ -313,8 +373,13 @@ function App(){
  const othersDone=()=>{
   // DEMO ONLY: real participants act through their own devices.
   const who=members.filter(x=>!x.org&&!x.sub&&DEMO_ORDERS[x.id]);
-  if(g.closed||who.length===0)return say(g.closed?'Ordering is closed':'Everyone has already submitted');
-  setP(p=>p.map(x=>who.some(w=>w.id===x.id)?{...x,items:DEMO_ORDERS[x.id],sub:1,pmeth:x.id===3?null:'card'}:x));
+  if(!orderingOpen())return say('Ordering is closed');
+  if(!who.length)return say('Everyone has already submitted');
+  setP(p=>p.map(x=>{
+   if(!who.some(w=>w.id===x.id))return x;
+   const items=DEMO_ORDERS[x.id].filter(i=>!g.sold.includes(i.id));
+   return {...x,items,rw:null,sub:{items,rw:null},pmeth:x.id===3?null:'card'};
+  }));
   note(who.length+' participant'+(who.length===1?'':'s')+' submitted their orders','check',[0]);
   const late=who.some(w=>w.id===3);say(who.map(w=>w.n).join(', ')+(late?' submitted. Dylan still needs to choose a payment method.':' submitted.'));
  };
@@ -387,14 +452,21 @@ function App(){
     <label className="l">Outlet</label>
     {OUTLET_CAPS.map((o,i)=><div key={i} className={'opt '+(g.oi===i?'on':'')} onClick={()=>setOutlet(i)}><b>{o.n}</b><div className="mute">Estimated wait {o.w}</div></div>)}
     <label className="l">Pickup time</label>
-    <div className="chips">{Object.keys(outlet.slots).map(t=><button key={t} disabled={outlet.slots[t]<g.size} className={'chip '+(g.slot===t?'on':'')} onClick={()=>setG({...g,slot:t})}>{t}</button>)}</div>
-    <div className="mute" style={{marginTop:10}}>Crossed-out times are full for {g.size} people. Try fewer people or another outlet.</div>
-    <div className="sticky"><button className="btn" disabled={!g.slot} onClick={()=>{setG(x=>{const ok=[30,15,10,5].find(m=>m<=x.win&&Date.now()+m*60000<=(x.slotMs[x.slotTimes.indexOf(x.slot)]||Infinity));return {...x,win:ok||5}});setStep(3)}}>Next: ordering time</button></div>
+    <div className="chips">{Object.keys(outlet.slots).map(t=><button key={t} disabled={!slotAvailable(t,Date.now()+5*60000)} className={'chip '+(g.slot===t?'on':'')} onClick={()=>setG({...g,slot:t})}>{t}</button>)}</div>
+    <div className="mute" style={{marginTop:10}}>Crossed-out times are full for {g.size} people or too soon. Try another time, outlet or group size.</div>
+    <div className="sticky"><button className="btn" disabled={!g.slot} onClick={()=>{
+     const now=Date.now();
+     if(!slotAvailable(g.slot,now+5*60000)){
+      setG(x=>({...x,...slotSet(),slot:''}));return say('Choose a later pickup time');
+     }
+     const win=[30,15,10,5].find(m=>m<=g.win&&now+m*60000<slotAt);
+     setG(x=>({...x,win}));setStep(3);
+    }}>Next: ordering time</button></div>
    </>}
    {step===3&&<>
     <h2 className="ttl">Ordering time and payment</h2>
     <label className="l">How long can people order?</label>
-    <div className="chips">{[5,10,15,30].map(m=>{const late=!!slotAt&&Date.now()+m*60000>slotAt;return <button key={m} disabled={late} className={'chip '+(g.win===m&&!late?'on':'')} onClick={()=>setG({...g,win:m})}>{m} minutes</button>})}</div>
+    <div className="chips">{[5,10,15,30].map(m=>{const late=Date.now()+m*60000>=slotAt;return <button key={m} disabled={late} className={'chip '+(g.win===m&&!late?'on':'')} onClick={()=>setG({...g,win:m})}>{m} minutes</button>})}</div>
     <div className="mute" style={{marginTop:10}}>Ordering closes at {tm(Date.now()+g.win*60000)}. Everyone sees a countdown and gets a reminder.</div>
     <label className="l">Who pays?</label>
     <div className={'opt '+(g.pay==='individual'?'on':'')} onClick={()=>setG({...g,pay:'individual'})}><b>Everyone pays for their own</b></div>
@@ -429,20 +501,20 @@ function App(){
   {screen==='group'&&(!g.live?<div className="card"><div className="mute">No group order yet.</div>{isOrg&&<button className="btn" style={{marginTop:10}} onClick={newOrder}>Start Ya Kun Together</button>}</div>:<>
    <div className="card"><div className="row"><b className="sp">{g.name}</b><Tag c={g.sent?'ok':g.closed?'':'w'}>{statusText}</Tag></div>
     {infoRows(false)}</div>
-   {isOrg&&!g.sent&&<div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div><button className="btn sm" onClick={copyLink}>Copy link</button></div>}
+   {isOrg&&pending&&<div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div><button className="btn sm" onClick={copyLink}>Copy link</button></div>}
    <div className="h3">Members ({members.length}/{g.size})</div>
    {members.map(p=><div className={'card row'+(p.id===uid?' mine':'')} key={p.id}><div className="av">{p.n[0]}</div><div className="sp"><b>{p.n}{p.org?' (organiser)':''}</b>{isOrg&&<div className="mute">{p.sub?'Order submitted':g.closed?'Missed deadline':waitText(p)}</div>}</div>
-    {isOrg&&!p.org&&!g.sent&&<button className="btn sm ghost" onClick={()=>setSheet({k:'confirm',title:'Remove '+p.n+'?',msg:`${p.n}'s order will be cleared and they will need a new invite to rejoin.`,label:'Remove',action:()=>{removeP(p);setSheet(null)}})}>Remove</button>}</div>)}
+    {isOrg&&!p.org&&pending&&<button className="btn sm ghost" onClick={()=>setSheet({k:'confirm',title:'Remove '+p.n+'?',msg:`${p.n}'s order will be cleared and they will need a new invite to rejoin.`,label:'Remove',action:()=>{removeP(p);setSheet(null)}})}>Remove</button>}</div>)}
    {isOrg&&!g.sent&&!g.cancelled&&!g.closed&&(()=>{const outside=P.filter(p=>!p.in),full=members.length>=g.size;return outside.length>0&&<>
     <div className="h3">Add people</div>
     {full&&<Ban>{g.size>=MAXSIZE?`Group is full (maximum ${MAXSIZE} people).`:`Group is full (${members.length}/${g.size}).`} {g.size<MAXSIZE&&<button className="link" onClick={()=>setSheet({k:'slot'})}>Raise group size</button>}</Ban>}
     {outside.map(p=><div className="card row" key={p.id}><div className="av">{p.n[0]}</div><div className="sp"><b>{p.n}</b>{p.left?<div className="mute">Left this group</div>:null}</div>
      <button className="btn sm" disabled={full} aria-label={'Add '+p.n} onClick={()=>addP(p)}>Add</button></div>)}</>})()}
-   {isOrg&&!g.sent&&<div className="row" style={{marginTop:6}}><button className="btn ghost sm pair" disabled={!!slotAt&&Math.max(g.deadlineAt,Date.now())>=slotAt} onClick={extend}>Extend 15 minutes</button><button className="btn sm pair" disabled={g.closed} onClick={()=>setSheet({k:'confirm',title:'Close ordering now?',msg:"Nobody will be able to submit or change an order after this, even if the deadline hasn't passed.",label:'Close ordering',action:()=>{closeEarly();setSheet(null)}})}>Close ordering</button></div>}
+   {isOrg&&pending&&<div className="row" style={{marginTop:6}}><button className="btn ghost sm pair" disabled={Math.max(g.deadlineAt,Date.now())>=extensionLimit} onClick={extend}>Extend 15 minutes</button><button className="btn sm pair" disabled={g.closed} onClick={()=>setSheet({k:'confirm',title:'Close ordering now?',msg:"Nobody will be able to submit or change an order after this, even if the deadline hasn't passed.",label:'Close ordering',action:()=>{closeEarly();setSheet(null)}})}>Close ordering</button></div>}
    {isOrg&&!g.sent&&!g.cancelled&&<button className="btn ghost" style={{marginTop:12}} onClick={()=>setSheet({k:'slot'})}>Change pickup time or group size</button>}
    {isOrg&&<button className="btn ghost" style={{marginTop:12}} onClick={saveGroup}>Save this group</button>}
    {isOrg&&!g.sent&&!g.cancelled&&<button className="link danger" style={{marginTop:16}} onClick={()=>setSheet({k:'cancel'})}>Cancel group order</button>}
-   {!isOrg&&!g.sent&&<button className="btn ghost" style={{marginTop:10}} onClick={()=>setSheet({k:'confirm',title:'Leave this group?',msg:'Your order (if any) will be removed. You can rejoin with the invite link.',label:'Leave group',action:()=>{leave();setSheet(null)}})}>Leave group</button>}
+   {!isOrg&&pending&&<button className="btn ghost" style={{marginTop:10}} onClick={()=>setSheet({k:'confirm',title:'Leave this group?',msg:'Your order (if any) will be removed. You can rejoin with the invite link.',label:'Leave group',action:()=>{leave();setSheet(null)}})}>Leave group</button>}
   </>)}
 
   {screen==='menu'&&<>
@@ -451,32 +523,32 @@ function App(){
    {MENU.filter(m=>m.cat===cat).map(m=>{const out=g.sold.includes(m.id);return <div className="card row" key={m.id} style={{opacity:out?.6:1}}><div className="em">{m.img?<img src={m.img} alt={m.name}/>:<Icon n={m.e} s={28}/>}</div><div className="sp"><b>{m.name}</b><div className="mute">{m.desc}</div><b style={{color:'var(--red)'}}>{$(m.price)}</b> {out&&<Tag c="w">Unavailable</Tag>}</div>
     <button className="add" disabled={!editable||out} aria-label={'Add '+m.name} onClick={()=>setSheet({k:'item',m,drink:'Kopi',sw:'Normal',temp:'Hot',q:1})}>+</button></div>})}
    {!editable&&!(g.live&&me.in)&&<div className="card row"><div className="sp mute">{g.live&&!g.cancelled?'Join '+g.name+' to add items.':isOrg?'Start a group order to add items.':'Join a group order to add items.'}</div>{g.live&&!g.cancelled?<button className="btn sm" onClick={()=>setScr('join')}>View invitation</button>:isOrg&&<button className="btn sm" onClick={newOrder}>Start</button>}</div>}
-   {me.items.length>0&&<div className="sticky"><button className="btn" onClick={()=>setScr('cart')}>View my order · {$(sum(me.items))}</button></div>}
+   {cart.items.length>0&&<div className="sticky"><button className="btn" onClick={()=>setScr('cart')}>View my order · {$(sum(cart.items))}</button></div>}
   </>}
 
   {screen==='cart'&&<>
    {g.sent?<Ban>The group order was sent to the outlet. It can't be changed now.</Ban>:g.closed&&<Ban c="e">Ordering is closed. Your order can't be changed.</Ban>}
-   {!!me.sub&&!me.dirty&&!g.closed&&<Ban c="k">Submitted. You can edit until {g.deadline}.</Ban>}
-   {!!me.dirty&&<Ban>You changed your order. Update it so the group sees the latest version.</Ban>}
+   {!!me.sub&&!dirty&&editable&&<Ban c="k">Submitted. You can edit until {g.deadline}.</Ban>}
+   {dirty&&<Ban>You changed your order. Update it so the group sees the latest version.</Ban>}
    {declined&&<Ban c="e">Your payment was declined. Choose another payment method so the order can be sent.</Ban>}
    <div className="mute" style={{marginBottom:8}}>Only you can change these items. Each one shows under your name in the group order.</div>
-   {me.items.length===0&&<div className="card"><div className="mute">Your order is empty. Browse the menu to add items.</div><button className="btn ghost sm" style={{marginTop:10}} disabled={!myHist.length} onClick={()=>reorder(myHist[0])}>Reorder my last order</button></div>}
-   {me.items.map((c,i)=><div className="card" key={i}><div className="row"><div className="sp"><b>{c.name}</b>{optTxt(c.o)&&<div className="mute">{optTxt(c.o)}</div>}</div>
+   {cart.items.length===0&&<div className="card"><div className="mute">{dirty?'Update your order to withdraw your submitted items.':'Your order is empty. Browse the menu to add items.'}</div><button className="btn ghost sm" style={{marginTop:10}} disabled={!editable||!myHist.length} onClick={()=>reorder(myHist[0])}>Reorder my last order</button></div>}
+   {cart.items.map((c,i)=><div className="card" key={i}><div className="row"><div className="sp"><b>{c.name}</b>{optTxt(c.o)&&<div className="mute">{optTxt(c.o)}</div>}</div>
     <div className="qty"><button disabled={!editable} onClick={()=>setItems(x=>x.map((y,k)=>k===i?{...y,q:y.q-1}:y).filter(y=>y.q>0))}>−</button><b>{c.q}</b><button disabled={!editable} onClick={()=>setItems(x=>x.map((y,k)=>k===i?{...y,q:y.q+1}:y))}>+</button></div><b style={{width:56,textAlign:'right'}}>{$(c.p*c.q)}</b></div>
     {g.sold.includes(c.id)&&<div style={{color:'var(--red)',fontWeight:700,fontSize:13,marginTop:6}}>Unavailable at this outlet. Remove it to continue.</div>}</div>)}
-   {me.items.length>0&&<>
+   {cart.items.length>0&&<>
     <div className="card"><div className="row"><b className="sp">Cherish reward</b><span className="mute">{me.pts} points</span></div>
-     {rw(me)?<div className="opt on" style={{margin:'10px 0 0'}}><b>{rw(me).t} applied</b><div className="mute">Uses {rw(me).cost} points from your account, taken when the group order is sent.</div>{freeOf(me)&&<div className="mute">One free {freeOf(me).free} is added to your order.</div>}{editable&&<button className="link" onClick={()=>upd(uid,{rw:null})}>Remove reward</button>}</div>
+     {rw(cart)?<div className="opt on" style={{margin:'10px 0 0'}}><b>{rw(cart).t} applied</b><div className="mute">Uses {rw(cart).cost} points from your account, taken when the group order is sent.</div>{freeOf(cart)&&<div className="mute">One free {freeOf(cart).free} is added to your order.</div>}{editable&&<button className="link" onClick={()=>setReward(null)}>Remove reward</button>}</div>
      :<button className="btn ghost sm" style={{marginTop:10}} disabled={!editable} onClick={()=>setSheet({k:'rewards'})}>View eligible rewards</button>}</div>
-    <div className="card"><div className="row"><span className="sp">Subtotal</span>{$(sum(me.items))}</div>
-     {freeOf(me)&&<div className="row"><span className="sp">Free {freeOf(me).free} (reward)</span>{$(0)}</div>}
-     {rw(me)&&sum(me.items)-owed(me)>0&&<div className="row voucher"><span className="sp">{rw(me).t}</span>− {$(sum(me.items)-owed(me))}</div>}
-     <div className="row" style={{marginTop:6}}><b className="sp">{g.pay==='sponsor'&&!isOrg?org.n+' is paying for you':'You pay'}</b><b>{g.pay==='sponsor'&&!isOrg?$(0):$(owed(me))}</b></div>
-     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':g.pay==='sponsor'?<>You'll earn about <b>{pts10(groupTotal+(me.sub?0:owed(me)))} Cherish points</b>.</>:<>You'll earn about <b>{earnOf(me)} Cherish points</b> when the group order is collected.</>}</div></div>
+    <div className="card"><div className="row"><span className="sp">Subtotal</span>{$(sum(cart.items))}</div>
+     {freeOf(cart)&&<div className="row"><span className="sp">Free {freeOf(cart).free} (reward)</span>{$(0)}</div>}
+     {rw(cart)&&sum(cart.items)-owed(cart)>0&&<div className="row voucher"><span className="sp">{rw(cart).t}</span>− {$(sum(cart.items)-owed(cart))}</div>}
+     <div className="row" style={{marginTop:6}}><b className="sp">{g.pay==='sponsor'&&!isOrg?org.n+' is paying for you':'You pay'}</b><b>{g.pay==='sponsor'&&!isOrg?$(0):$(owed(cart))}</b></div>
+     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':g.pay==='sponsor'?<>You'll earn about <b>{pts10(groupTotal-(me.sub?owed(me):0)+owed(cart))} Cherish points</b>.</>:<>You'll earn about <b>{earnOf(cart)} Cherish points</b> when the group order is collected.</>}</div></div>
+   </>}
     {!!me.sub&&g.pay==='individual'&&owed(me)>0&&!g.sent&&(me.pmeth?<><Ban c="k">Payment method: {mName(me.pmeth,uid)}. You will be charged {$(owed(me))} only when {isOrg?'you send':'the organiser sends'} the group order.</Ban><button className="link" onClick={()=>goPay('me')}>Change payment method</button></>:<button className="btn" style={{marginTop:10}} onClick={()=>goPay('me')}>Choose payment method</button>)}
     {g.sent&&!!me.paid&&me.paidAmt>0&&<Ban c="k">Charged {$(me.paidAmt)} to {me.paidMeth}</Ban>}
-    {editable&&<div className="sticky"><button className="btn" disabled={bad(me).length>0} onClick={submit}>{me.sub?'Update my order':'Submit my order'}</button></div>}
-   </>}
+    {editable&&(cart.items.length>0||!!me.sub)&&<div className="sticky"><button className="btn" disabled={bad(cart).length>0} onClick={submit}>{me.sub?'Update my order':'Submit my order'}</button></div>}
   </>}
 
   {screen==='pay'&&<>
@@ -493,11 +565,11 @@ function App(){
    <button className="btn" onClick={()=>setScr('done')}>View group order</button>
   </>}
 
-  {screen==='track'&&(!g.live?<div className="card mute">No group order yet.</div>:<>
+  {screen==='track'&&(!g.live?<div className="card mute">No group order yet.</div>:!g.cancelled&&<>
    <div className="card"><div className="row"><div className="sp"><div className="mute">Overall status</div><b style={{fontSize:18}}>{statusText}</b></div>{isOrg&&<Tag c={everyone?'ok':'w'}>{everyone?'Everyone is ready':'Waiting'}</Tag>}</div>
     {infoRows(true)}</div>
    {declined&&<><Ban c="e">Your payment was declined. Choose another payment method so the order can be sent.</Ban>{isOrg&&<button className="btn ghost" style={{marginBottom:12}} onClick={()=>goPay('me')}>Choose payment method</button>}</>}
-   {g.slotGone&&isOrg&&!g.sent&&<><Ban c="e">{g.slot} at {outlet.n} is no longer available. Choose another time before sending.</Ban><button className="btn ghost" style={{marginBottom:12}} onClick={()=>setSheet({k:'slot'})}>Choose new time</button></>}
+   {isOrg&&pending&&!slotAvailable(g.slot,Date.now())&&<><Ban c="e">{g.slot} at {outlet.n} is no longer available. Choose another time before sending.</Ban><button className="btn ghost" style={{marginBottom:12}} onClick={()=>setSheet({k:'slot'})}>Choose new time</button></>}
    {!isOrg&&<div className="card"><div className="row"><b className="sp">My order</b>{me.sub?<Tag c="ok">Submitted</Tag>:<Tag c={g.closed?'':'w'}>{g.closed?'Missed deadline':'Not submitted'}</Tag>}</div>
     <div className="mute" style={{margin:'6px 0'}}>{me.items.length?lines(me):'No items yet.'}</div>
     <div className="row"><span className="sp mute">Payment</span>{pstat(me)}</div>
@@ -558,10 +630,10 @@ function App(){
   </>}
 
   {screen==='wallet'&&<>
-   {!g.live||!me.in?<div className="card mute">Nothing to pay yet. Join or start a group order first.</div>:<div className="card">
+   {!g.live||!me.in||g.cancelled?<div className="card mute">{g.cancelled?'This group order was cancelled.':'Nothing to pay yet. Join or start a group order first.'}</div>:<div className="card">
     <div className="row"><b className="sp">{g.name}</b>{pstat(me)}</div>
     {declined&&<div style={{color:'var(--red)',fontWeight:700,fontSize:13,marginTop:6}}>Your payment was declined. Choose another payment method.</div>}
-    <div className="big" style={{margin:'8px 0'}}>{$(g.pay==='sponsor'?(isOrg?groupTotal:0):owed(me))}</div>
+    <div className="big" style={{margin:'8px 0'}}>{$(g.pay==='sponsor'?(isOrg?groupTotal:0):me.sub?owed(me):0)}</div>
     <div className="mute">{g.pay==='sponsor'?(isOrg?(g.sent?'Charged when you sent the order.':'You pay once, when you send the order to the outlet.'):org.n+' is paying for everyone.'):!me.sub?'Submit your order to see what you owe.':g.sent?(me.paid?(isOrg?'Charged when you sent the order.':'Charged when the organiser sent the order.'):'Nothing to pay.'):owed(me)===0?'Nothing to pay.':me.pmeth?'Payment method: '+mName(me.pmeth,uid)+'. You are only charged when '+(isOrg?'you send':'the organiser sends')+' the order.':'Choose a payment method. You are only charged when '+(isOrg?'you send':'the organiser sends')+' the order.'}</div>
     {g.pay==='individual'&&me.sub&&!g.sent&&owed(me)>0&&<button className={'btn'+(me.pmeth?' ghost':'')} style={{marginTop:12}} onClick={()=>goPay('me')}>{me.pmeth?'Change payment method':'Choose payment method'}</button>}
     {g.pay==='sponsor'&&isOrg&&!g.sent&&<><button className="btn" style={{marginTop:12}} disabled={!canSend} onClick={()=>goPay('group')}>Pay {$(groupTotal)} and send to outlet</button>{!canSend&&<div className="mute" style={{marginTop:8}}>{why}</div>}</>}</div>}
@@ -599,14 +671,15 @@ function App(){
     <div className="row" style={{marginTop:18}}><div className="qty"><button onClick={()=>setSheet({...sheet,q:Math.max(1,sheet.q-1)})}>−</button><b>{sheet.q}</b><button onClick={()=>setSheet({...sheet,q:sheet.q+1})}>+</button></div>
     <button className="btn sp" onClick={addToCart}>Add to order · {$((sheet.m.price+((sheet.m.set||sheet.m.dr)&&sheet.temp.startsWith('Iced')?0.6:0))*sheet.q)}</button></div></>}
    {sheet.k==='rewards'&&<><b style={{fontSize:18}}>Your Cherish rewards</b><div className="mute" style={{marginBottom:10}}>Rewards apply only to your own items.</div>
-    {REWARDS.map(r=>{const okp=me.pts>=r.cost,okm=sum(me.items)>=r.min,ok=okp&&okm;return <div key={r.id} className={'opt '+(okp?'':'dis')} onClick={()=>{if(!okp)return;if(!okm){say('Spend '+$(r.min)+' or more to use '+r.t,1);return}upd(uid,{rw:r.id});setSheet(null);say(r.t+' applied')}}><div className="row"><b className="sp">{r.t}</b>{okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.free?'Adds one free '+r.free+' · ':''}{r.cost} points{okp&&!okm?' · add '+$(r.min-sum(me.items))+' more to your order to use it':''}</div></div>})}</>}
+    {REWARDS.map(r=>{const okp=me.pts>=r.cost,okm=sum(draft.items)>=r.min;return <div key={r.id} className={'opt '+(okp?'':'dis')} onClick={()=>{if(!okp)return;if(!okm){say('Spend '+$(r.min)+' or more to use '+r.t,1);return}setReward(r.id)}}><div className="row"><b className="sp">{r.t}</b>{okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.free?'Adds one free '+r.free+' · ':''}{r.cost} points{okp&&!okm?' · add '+$(r.min-sum(draft.items))+' more to your order to use it':''}</div></div>})}</>}
    {sheet.k==='slot'&&<><b style={{fontSize:20}}>Pickup time and group size</b>
     <div className="mute" style={{margin:'6px 0 4px'}}>A smaller group can open up more pickup times.</div>
     <label className="l">Group size</label>
     <div className="stepper"><button onClick={()=>setG(x=>({...x,size:Math.max(members.length,x.size-1)}))} aria-label="Fewer people">−</button><div><b>{g.size}</b><div className="mute">people</div></div><button onClick={()=>setG(x=>{if(x.size>=MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`,1,1500);return x}return {...x,size:x.size+1}})} aria-label="More people">+</button></div>
     <label className="l">Pickup time</label>
-    <div className="chips">{Object.keys(outlet.slots).map(t=><button key={t} className={'chip '+(g.slot===t&&slotValid?'on':'')} disabled={outlet.slots[t]<g.size||(g.slotGone&&t===g.slot)||(g.slotMs[g.slotTimes.indexOf(t)]||0)<g.deadlineAt} onClick={()=>{setG(x=>({...x,slot:t,slotGone:false}));note('Pickup time changed to '+t,'clock')}}>{t}</button>)}</div>
-    {!slotValid&&<Ban c="e"><span style={{display:'block',marginTop:14}}>Pick a time that fits {g.size} people.</span></Ban>}
+    <div className="chips">{Object.keys(outlet.slots).map(t=><button key={t} className={'chip '+(g.slot===t&&slotAvailable(t,Date.now())?'on':'')} disabled={!slotAvailable(t,Date.now())} onClick={()=>{if(!pending||!slotAvailable(t,Date.now()))return;setG(x=>({...x,slot:t,slotGone:false}));note('Pickup time changed to '+t,'clock')}}>{t}</button>)}</div>
+    {!slotAvailable(g.slot,Date.now())&&<Ban c="e"><span style={{display:'block',marginTop:14}}>Pick an available future time that fits {g.size} people.</span></Ban>}
+    {!g.slotTimes.some(t=>timeOfSlot(t)>Math.max(Date.now(),g.deadlineAt))&&<button className="btn ghost sm" onClick={()=>setG(x=>({...x,...slotSet(),slot:'',slotGone:false}))}>Show new pickup times</button>}
     <button className="btn" style={{marginTop:22}} onClick={()=>setSheet(null)}>Done</button></>}
    {sheet.k==='hist'&&(()=>{const h=sheet.h,m=h.orders[uid];return <><b style={{fontSize:18}}>{h.name}</b>
     <div className="mute">#{h.id} · {fdt(h.at)}</div>
