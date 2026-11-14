@@ -5,7 +5,7 @@ import './styles.css';
 // NOTE: state is local and mocked. Data comes from ./data.js.
 // Open the gear button (top right of the phone) to switch between organiser and participant views and to trigger error states.
 
-const pts10 = v => Math.floor(v*10);
+const pointsFor = (v,memberCount=1) => Math.floor(Math.round(v*100)*8*(10+Math.max(0,memberCount-1))/1000);
 const TOAST_MS = 1000;   // every pop-up message disappears after 1 second
 // Payment methods a person can pick. Picking one does NOT charge anything; the charge happens when the organiser sends the order.
 const METHODS = ['card'];   // Ya Kun only supports its card payment
@@ -106,6 +106,9 @@ function App(){
  const slotAvailable=(t,now)=>slotFits(t)&&timeOfSlot(t)>Math.max(now,g.deadlineAt);
  Pr.current=P;
  const members=P.filter(p=>p.in).map(submitted), subm=members.filter(p=>p.sub);
+ const groupMultiplier=(10+Math.max(0,members.length-1))/10;
+ const groupPoints=v=>pointsFor(v,members.length);
+ const pointsInfo=groupMultiplier.toFixed(1)+'× points for '+members.length+' group member'+(members.length===1?'':'s')+' · base rate 8 points per $1';
  const rw=p=>REWARDS.find(r=>r.id===p.rw);
  // Points are only spent when the group order is sent (see `send`), so every screen shows the real balance until then.
  const avail=me.pts;
@@ -113,7 +116,7 @@ function App(){
  const groupTotal=subm.reduce((s,p)=>s+owed(p),0);
  // Points follow the money: when everyone pays for their own, each person earns on their own items.
  // When the organiser pays for everyone, only the organiser earns points (on the whole group total).
- const earnOf=p=>g.pay==='sponsor'?(p.org?pts10(groupTotal):0):pts10(owed(p));
+ const earnOf=p=>g.pay==='sponsor'?(p.org?groupPoints(groupTotal):0):groupPoints(owed(p));
  const earners=g.pay==='sponsor'?members.filter(p=>p.org):subm;
  const declined=!!me.payFail&&!g.sent;
  // Nobody is charged until the order is sent. "Ready to pay" just means a payment method has been chosen.
@@ -147,6 +150,7 @@ function App(){
   <span>Outlet</span><b>{outlet.n}</b>
   <span>Collection</span><b>{g.slot}{g.sent&&' (locked)'}</b>
   <span>Payment</span><b>{g.pay==='sponsor'?org.n+' pays for everyone':'Everyone pays for their own order'}</b>
+  <span>Points multiplier</span><b>{groupMultiplier.toFixed(1)}× · {members.length} member{members.length===1?'':'s'}</b>
  </div>;
  const statusText=g.cancelled?'Cancelled':g.sent?(g.status==='collected'?'Collected':g.status==='ready'?'Ready for collection':'Being prepared'):g.closed?'Ordering closed':'Ordering open';
  const invState=g.sent||g.cancelled||g.inv==='expired'?'expired':(g.inv==='full'||members.length>=g.size)?'full':'valid';
@@ -163,7 +167,8 @@ function App(){
  const meth=mName(me.pmeth||'card',uid);
  // Order history: the current group appears as soon as it is sent (so it is never lost), older ones are archived below it.
  const snapshot=()=>({s:1,id:g.gid,name:g.name,at:g.sentAt||Date.now(),outlet:outlet.n,slot:g.slot,coll:g.coll,status:g.status||'preparing',pay:g.pay,total:groupTotal,
-  payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:pts10(groupTotal)}:null,
+  multiplier:groupMultiplier,
+  payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:groupPoints(groupTotal)}:null,
   members:subm.map(p=>p.n),
   orders:Object.fromEntries(subm.map(p=>[p.id,{items:p.items.map(i=>({...i})),owed:owed(p),rw:rw(p)?rw(p).t:'',free:freeOf(p)?freeOf(p).free:'',earn:g.status==='collected'?p.earned:earnOf(p)}]))});
  const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist];
@@ -546,7 +551,8 @@ function App(){
      {freeOf(cart)&&<div className="row"><span className="sp">Free {freeOf(cart).free} (reward)</span>{$(0)}</div>}
      {rw(cart)&&sum(cart.items)-owed(cart)>0&&<div className="row voucher"><span className="sp">{rw(cart).t}</span>− {$(sum(cart.items)-owed(cart))}</div>}
      <div className="row" style={{marginTop:6}}><b className="sp">{g.pay==='sponsor'&&!isOrg?org.n+' is paying for you':'You pay'}</b><b>{g.pay==='sponsor'&&!isOrg?$(0):$(owed(cart))}</b></div>
-     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':g.pay==='sponsor'?<>You'll earn about <b>{pts10(groupTotal-(me.sub?owed(me):0)+owed(cart))} Cherish points</b>.</>:<>You'll earn about <b>{earnOf(cart)} Cherish points</b> when the group order is collected.</>}</div></div>
+     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':g.pay==='sponsor'?<>You'll earn about <b>{groupPoints(groupTotal-(me.sub?owed(me):0)+owed(cart))} Cherish points</b>.</>:<>You'll earn about <b>{earnOf(cart)} Cherish points</b> when the group order is collected.</>}</div>
+     <div className="mute" style={{marginTop:6}}>{pointsInfo}. The multiplier is fixed when the group order is sent.</div></div>
    </>}
     {!!me.sub&&g.pay==='individual'&&owed(me)>0&&!g.sent&&(me.pmeth?<><Ban c="k">Payment method: {mName(me.pmeth,uid)}. You will be charged {$(owed(me))} only when {isOrg?'you send':'the organiser sends'} the group order.</Ban><button className="link" onClick={()=>goPay('me')}>Change payment method</button></>:<button className="btn" style={{marginTop:10}} onClick={()=>goPay('me')}>Choose payment method</button>)}
     {g.sent&&!!me.paid&&me.paidAmt>0&&<Ban c="k">Charged {$(me.paidAmt)} to {me.paidMeth}</Ban>}
@@ -554,6 +560,7 @@ function App(){
   </>}
 
   {screen==='pay'&&<>
+   <div className="card mute">{pointsInfo}</div>
    <div className="hero" style={{textAlign:'center'}}><div className="mute">{pm==='group'?'Group total':'You will pay when the order is sent'}</div><div className="big">{$(pm==='group'?groupTotal:owed(me))}</div>{pm==='group'&&<div className="mute">One payment covers everyone's order.</div>}<div className="mute" style={{marginTop:6}}>You will earn about <b>{earnOf(me)} Cherish points</b>{pm==='group'?' for the whole group order':''} when the group order is collected.</div></div>
    {err&&<Ban c="e">{err}</Ban>}
    <label className="l" style={{marginTop:0}}>Payment method</label>
@@ -610,6 +617,7 @@ function App(){
     <div className="card">{subm.map(p=><div key={p.id} style={{padding:'8px 0'}}><b>{p.n}</b>{p.items.map((i,k)=><div className="mute" key={k}>{itemLine(i)}</div>)}{freeOf(p)&&<div className="mute">Free {freeOf(p).free} (reward)</div>}</div>)}</div>
    </>:<div className="card"><b>My items</b>{me.items.length?me.items.map((i,k)=><div className="mute" key={k}>{itemLine(i)}</div>):<div className="mute">No items</div>}{freeOf(me)&&<div className="mute">Free {freeOf(me).free} (reward)</div>}</div>}
    <div className="h3">Cherish points</div>
+   <div className="mute" style={{marginBottom:8}}>{pointsInfo}</div>
    <div className="card">{earners.filter(p=>isOrg||p.id===uid).map(p=><div className="row" key={p.id} style={{padding:'4px 0'}}><span className="sp">{p.n}</span><b style={{color:'var(--ok)'}}>+ {g.status==='collected'?p.earned:earnOf(p)} points</b></div>)}{g.pay==='sponsor'&&!isOrg&&<div className="mute">{org.n} paid for this order, so {org.n} earns the points.</div>}<div className="mute" style={{marginTop:6}}>{g.pay==='sponsor'?(g.status==='collected'?'These points have been added to the organiser\'s account.':'The organiser earns points on the whole group order. They are credited once the order is marked collected.'):(g.status==='collected'?'These points have been added to each account.':'Points shown are what each person will get. They are credited once the organiser marks the order collected.')}</div></div>
    {isOrg&&<button className="btn ghost" onClick={saveGroup}>Save this group</button>}
    {isOrg&&g.status==='collected'&&<button className="btn" style={{marginTop:12}} onClick={newOrder}>Start a new group order</button>}
@@ -687,13 +695,14 @@ function App(){
     <div className="mute">#{h.id} · {fdt(h.at)}</div>
     <div className="mute">{h.outlet} · pickup {h.slot}{h.coll?' · collection '+h.coll:''}</div>
     <div className="mute">{STAT[h.status]} · {h.pay==='sponsor'?'Organiser paid for everyone':'Everyone paid for their own order'}</div>
+    {h.multiplier!=null&&<div className="mute">{h.multiplier.toFixed(1)}× group points multiplier</div>}
     <div className="h3">Your order</div>
     {m?<>{m.items.map((i,k)=><div className="row" key={k} style={{padding:'4px 0'}}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}{i.q>1&&<div className="mute">× {i.q}</div>}</span>{$(i.p*i.q)}</div>)}{m.free&&<div className="row" style={{padding:'4px 0'}}><span className="sp">{m.free}<div className="mute">Free reward</div></span>{$(0)}</div>}
     </>:<div className="mute">You didn't submit an order in this group.</div>}
     {(m||payer)&&<>
      <div className="row" style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--line)'}}><b className="sp">{sponsor&&!isOrg?'Paid by '+USERS0[0].n:'You paid'}</b><b>{$(payer?(h.payer?.amount??h.total):sponsor?0:m.owed)}</b></div>
      {payer&&h.payer?.method&&<div className="mute">{h.payer.method}</div>}
-     <div className="mute" style={{marginTop:4}}>{sponsor&&!isOrg?USERS0[0].n+' earned the points for this order':(payer?(h.payer?.earn??pts10(h.total)):m.earn)+' Cherish points earned'}</div>
+     <div className="mute" style={{marginTop:4}}>{sponsor&&!isOrg?USERS0[0].n+' earned the points for this order':(payer?(h.payer?.earn??pointsFor(h.total)):m.earn)+' Cherish points earned'}</div>
     </>}
     <div className="h3">Who got what</div><div className="card">{Object.entries(h.orders).map(([k,o])=><div key={k} style={{padding:'6px 0'}}><b>{USERS0[k].n}{+k===uid?' (you)':''}</b>{o.items.map((i,x)=><div className="mute" key={x}>{itemLine(i)}</div>)}{o.free&&<div className="mute">Free {o.free} (reward)</div>}</div>)}{isOrg&&<div className="row" style={{marginTop:6}}><span className="sp mute">Group total</span><b>{$(h.total)}</b></div>}</div>
     {m&&<button className="btn" style={{marginTop:14}} onClick={()=>reorder(h)}>Reorder with changes</button>}</>})()}
