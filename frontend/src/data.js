@@ -173,20 +173,26 @@ export const repriceItem = item => {
  const sweetness=/kosong/i.test(option)?'Kosong':/less/i.test(option)?'Less sweet':/more/i.test(option)?'More sweet':'Normal';
  return {...item,name:menu.name,p:itemPrice(menu,drink.name),o:drink.name+', '+sweetness.toLowerCase()};
 };
-export const tm = ms => new Date(ms).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
-// Pickup slots are generated fresh (not baked in at import time) so they always sit ~15/30/45/60 min
-// ahead of whenever the group is actually being created, instead of drifting stale.
-export const SLOT_OFFSETS_MIN = [15, 30, 45, 60];
-export const makeSlotMs = (base = Date.now()) => { const r = Math.ceil(base / 300000) * 300000; return SLOT_OFFSETS_MIN.map(m => r + m * 60000); };
-export const makeSlotTimes = (base = Date.now()) => {
-  const rounded = Math.ceil(base / 300000) * 300000; // round up to the next 5-minute mark, for a tidy label
-  return SLOT_OFFSETS_MIN.map(m => tm(rounded + m * 60000));
+export const tm = ms => new Date(ms).toLocaleTimeString('en-SG', {timeZone:'Asia/Singapore',hour:'numeric',minute:'2-digit'});
+export const QUICK_SLOT_COUNT = 4;
+// Four quick choices, followed by later choices every 30 minutes up to 24 hours ahead.
+export const SLOT_OFFSETS_MIN = [15,...Array.from({length:48},(_,i)=>(i+1)*30)];
+export const makeSlotMs = (base = Date.now()) => {
+ const rounded=Math.ceil(base/300000)*300000;
+ return SLOT_OFFSETS_MIN.map(m=>rounded+m*60000).filter(ms=>ms<=base+24*60*60000);
 };
+export const slotLabel = (ms,index) => {
+ if(index===0)return 'ASAP (~'+tm(ms)+')';
+ if(index<QUICK_SLOT_COUNT)return tm(ms);
+ const day=new Date(ms).toLocaleDateString('en-SG',{timeZone:'Asia/Singapore',weekday:'short',day:'numeric',month:'short'});
+ return day+' · '+tm(ms);
+};
+export const makeSlotTimes = (base = Date.now()) => makeSlotMs(base).map(slotLabel);
 // Capacity per outlet, one number per slot above (largest group size that slot can still take).
 export const OUTLET_CAPS = [
- {n:'Ya Kun – Far East Square', w:'8 minutes', caps:[4,12,12,12]},
- {n:'Ya Kun – NTU North Spine', w:'12 minutes', caps:[12,4,12,12]},
- {n:'Ya Kun – Marina Bay Link Mall', w:'5 minutes', caps:[3,3,12,12]}];
+ {n:'Ya Kun – Far East Square', w:'8 minutes', caps:[4,12,12,12],laterCap:12},
+ {n:'Ya Kun – NTU North Spine', w:'12 minutes', caps:[12,4,12,12],laterCap:12},
+ {n:'Ya Kun – Marina Bay Link Mall', w:'5 minutes', caps:[3,3,12,12],laterCap:12}];
 
 export const REWARDS = [
  {id:'r1',t:'$2 off',cost:200,min:5,val:2},

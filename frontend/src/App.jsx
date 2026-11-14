@@ -1,5 +1,5 @@
 import {useState,useEffect,useRef} from 'react';
-import {$,sum,tm,MENU,CATEGORIES,SET_DRINKS,itemPrice,repriceItem,OUTLET_CAPS,makeSlotTimes,makeSlotMs,REWARDS,HIST0,SAVED0,USERS0,DEMO_ORDERS,MAXSIZE,CARD_LAST4,ACCOUNTS} from './data';
+import {$,sum,tm,MENU,CATEGORIES,SET_DRINKS,itemPrice,repriceItem,OUTLET_CAPS,QUICK_SLOT_COUNT,slotLabel,makeSlotMs,REWARDS,HIST0,SAVED0,USERS0,DEMO_ORDERS,MAXSIZE,CARD_LAST4,ACCOUNTS} from './data';
 import './styles.css';
 
 // NOTE: state is local and mocked. Data comes from ./data.js.
@@ -41,6 +41,17 @@ const MenuImage = ({item}) => {
  const {src,x,y,size}=item.photo;
  return <span className="menu-photo"><img src={src} alt={item.name} loading="lazy" style={{width:(588/size*100)+'%',left:-(x/size*100)+'%',top:-(y/size*100)+'%'}}/></span>;
 };
+function PickupChoices({times,selected,available,onPick,id}){
+ const later=times.slice(QUICK_SLOT_COUNT);
+ return <>
+  <div className="chips">{times.slice(0,QUICK_SLOT_COUNT).map(t=><button key={t} disabled={!available(t)} className={'chip '+(selected===t&&available(t)?'on':'')} onClick={()=>onPick(t)}>{t}</button>)}</div>
+  <label className="l" htmlFor={id}>Choose a later time</label>
+  <select id={id} className="menu-select" value={later.includes(selected)?selected:''} onChange={e=>onPick(e.target.value)}>
+   <option value="" disabled>Select a later pickup time</option>
+   {later.map(t=><option key={t} value={t} disabled={!available(t)}>{t}{available(t)?'':' (unavailable)'}</option>)}
+  </select>
+ </>;
+}
 const fmt = ms => { const s = Math.max(0,Math.ceil(ms/1000)); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); };
 const sgt = () => new Intl.DateTimeFormat('en-SG',{timeZone:'Asia/Singapore',hour:'numeric',minute:'2-digit'}).format(new Date());
 const Tag = ({c,children}) => <span className={'tag '+(c||'')}>{children}</span>;
@@ -74,7 +85,7 @@ const blank = p => ({...p,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:n
 const submitted = p => p.sub ? {...p,...p.sub} : p;
 const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[]};
 // n = how many group orders this session has already finished, so every new group gets its own order id and collection number.
-const slotSet = () => { const ms = makeSlotMs(); return {slotMs: ms, slotTimes: ms.map(tm)}; };
+const slotSet = () => { const ms = makeSlotMs(); return {slotMs: ms, slotTimes: ms.map(slotLabel)}; };
 const freshG = (n=0) => ({...G0, gid:'YT'+(1024+n), coll:'C-'+String(42+n).padStart(3,'0'), ...slotSet()});
 
 function App(){
@@ -104,7 +115,7 @@ function App(){
  const nid=useRef(0), toastT=useRef(null), Pr=useRef(null);
 
  const isOrg=uid===0, draft=P[uid], me=submitted(draft), org=P[0];
- const outlet={n:OUTLET_CAPS[g.oi].n,w:OUTLET_CAPS[g.oi].w,slots:Object.fromEntries(g.slotTimes.map((t,i)=>[t,OUTLET_CAPS[g.oi].caps[i]]))};
+ const outlet={n:OUTLET_CAPS[g.oi].n,w:OUTLET_CAPS[g.oi].w,slots:Object.fromEntries(g.slotTimes.map((t,i)=>[t,OUTLET_CAPS[g.oi].caps[i]??OUTLET_CAPS[g.oi].laterCap]))};
  const timeOfSlot=t=>g.slotMs[g.slotTimes.indexOf(t)]||0;
  const slotAt=timeOfSlot(g.slot);
  const slotFits=t=>outlet.slots[t]>=g.size&&!(g.slotGone&&t===g.slot);
@@ -202,7 +213,12 @@ function App(){
   if(id)say(REWARDS.find(r=>r.id===id).t+' applied');
  };
  const setSize=n=>{const min=Math.max(2,preset.length);if(n>MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`);n=MAXSIZE}if(n<min&&preset.length>2)say(`${preset.length} people are in this saved group`);setG(x=>({...x,size:Math.max(min,n)}))};
- const setOutlet=i=>setG(x=>{const idx=x.slotTimes.indexOf(x.slot),ok=idx>=0&&OUTLET_CAPS[i].caps[idx]>=x.size;return {...x,oi:i,slot:ok?x.slot:''}});
+ const setOutlet=i=>setG(x=>{const idx=x.slotTimes.indexOf(x.slot),ok=idx>=0&&(OUTLET_CAPS[i].caps[idx]??OUTLET_CAPS[i].laterCap)>=x.size;return {...x,oi:i,slot:ok?x.slot:''}});
+ const chooseSlot=t=>{
+  if(!isOrg||g.sent||g.cancelled||!slotAvailable(t,Date.now()+(g.live?0:5*60000)))return;
+  setG(x=>({...x,slot:t,slotGone:false}));
+  if(g.live)note('Pickup time changed to '+t,'clock');
+ };
 
 
  useEffect(()=>{
@@ -464,7 +480,8 @@ function App(){
     <label className="l">Outlet</label>
     {OUTLET_CAPS.map((o,i)=><div key={i} className={'opt '+(g.oi===i?'on':'')} onClick={()=>setOutlet(i)}><b>{o.n}</b><div className="mute">Estimated wait {o.w}</div></div>)}
     <label className="l">Pickup time</label>
-    <div className="chips">{Object.keys(outlet.slots).map(t=><button key={t} disabled={!slotAvailable(t,Date.now()+5*60000)} className={'chip '+(g.slot===t?'on':'')} onClick={()=>setG({...g,slot:t})}>{t}</button>)}</div>
+    <div className="mute" style={{marginBottom:8}}>ASAP is about 15–20 minutes. Choose a quick time below or use the dropdown for later pickup, up to 24 hours ahead.</div>
+    <PickupChoices times={g.slotTimes} selected={g.slot} available={t=>slotAvailable(t,Date.now()+5*60000)} onPick={chooseSlot} id="create-pickup"/>
     <div className="mute" style={{marginTop:10}}>Crossed-out times are full for {g.size} people or too soon. Try another time, outlet or group size.</div>
     <div className="sticky"><button className="btn" disabled={!g.slot} onClick={()=>{
      const now=Date.now();
@@ -689,10 +706,11 @@ function App(){
     {REWARDS.map(r=>{const okp=me.pts>=r.cost,okm=sum(draft.items)>=r.min;return <div key={r.id} className={'opt '+(okp?'':'dis')} onClick={()=>{if(!okp)return;if(!okm){say('Spend '+$(r.min)+' or more to use '+r.t,1);return}setReward(r.id)}}><div className="row"><b className="sp">{r.t}</b>{okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.free?'Adds one free '+r.free+' · ':''}{r.cost} points{okp&&!okm?' · add '+$(r.min-sum(draft.items))+' more to your order to use it':''}</div></div>})}</>}
    {sheet.k==='slot'&&<><b style={{fontSize:20}}>Pickup time and group size</b>
     <div className="mute" style={{margin:'6px 0 4px'}}>A smaller group can open up more pickup times.</div>
+    <div className="mute">Choose a quick pickup or use the dropdown for a later time, up to 24 hours ahead.</div>
     <label className="l">Group size</label>
     <div className="stepper"><button onClick={()=>setG(x=>({...x,size:Math.max(members.length,x.size-1)}))} aria-label="Fewer people">−</button><div><b>{g.size}</b><div className="mute">people</div></div><button onClick={()=>setG(x=>{if(x.size>=MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`,1,1500);return x}return {...x,size:x.size+1}})} aria-label="More people">+</button></div>
     <label className="l">Pickup time</label>
-    <div className="chips">{Object.keys(outlet.slots).map(t=><button key={t} className={'chip '+(g.slot===t&&slotAvailable(t,Date.now())?'on':'')} disabled={!slotAvailable(t,Date.now())} onClick={()=>{if(!pending||!slotAvailable(t,Date.now()))return;setG(x=>({...x,slot:t,slotGone:false}));note('Pickup time changed to '+t,'clock')}}>{t}</button>)}</div>
+    <PickupChoices times={g.slotTimes} selected={g.slot} available={t=>slotAvailable(t,Date.now())} onPick={chooseSlot} id="change-pickup"/>
     {!slotAvailable(g.slot,Date.now())&&<Ban c="e"><span style={{display:'block',marginTop:14}}>Pick an available future time that fits {g.size} people.</span></Ban>}
     {!g.slotTimes.some(t=>timeOfSlot(t)>Math.max(Date.now(),g.deadlineAt))&&<button className="btn ghost sm" onClick={()=>setG(x=>({...x,...slotSet(),slot:'',slotGone:false}))}>Show new pickup times</button>}
     <button className="btn" style={{marginTop:22}} onClick={()=>setSheet(null)}>Done</button></>}
