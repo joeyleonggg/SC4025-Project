@@ -1,5 +1,5 @@
 import {useState,useEffect,useRef} from 'react';
-import {$,sum,tm,MENU,OUTLET_CAPS,makeSlotTimes,makeSlotMs,REWARDS,HIST0,SAVED0,USERS0,DEMO_ORDERS,MAXSIZE,CARD_LAST4,ACCOUNTS} from './data';
+import {$,sum,tm,MENU,CATEGORIES,SET_DRINKS,itemPrice,repriceItem,OUTLET_CAPS,makeSlotTimes,makeSlotMs,REWARDS,HIST0,SAVED0,USERS0,DEMO_ORDERS,MAXSIZE,CARD_LAST4,ACCOUNTS} from './data';
 import './styles.css';
 
 // NOTE: state is local and mocked. Data comes from ./data.js.
@@ -36,6 +36,11 @@ const IC={
  cup:<><path d="M5 8h11v6a5 5 0 01-5 5h-1a5 5 0 01-5-5V8z"/><path d="M16 10h2a2 2 0 010 4h-2M8 3v2M12 3v2"/></>,
  egg:<path d="M12 3c-3.5 0-6.5 6-6.5 10a6.5 6.5 0 0013 0C18.5 9 15.5 3 12 3z"/>};
 const Icon = ({n,s=20}) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{IC[n]}</svg>;
+const MenuImage = ({item}) => {
+ if(!item.photo)return <Icon n={item.e} s={28}/>;
+ const {src,x,y,size}=item.photo;
+ return <span className="menu-photo"><img src={src} alt={item.name} loading="lazy" style={{width:(588/size*100)+'%',left:-(x/size*100)+'%',top:-(y/size*100)+'%'}}/></span>;
+};
 const fmt = ms => { const s = Math.max(0,Math.ceil(ms/1000)); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); };
 const sgt = () => new Intl.DateTimeFormat('en-SG',{timeZone:'Asia/Singapore',hour:'numeric',minute:'2-digit'}).format(new Date());
 const Tag = ({c,children}) => <span className={'tag '+(c||'')}>{children}</span>;
@@ -122,7 +127,7 @@ function App(){
  // Nobody is charged until the order is sent. "Ready to pay" just means a payment method has been chosen.
  const needsMethod=p=>g.pay==='individual'&&!!p.sub&&owed(p)>0&&!p.pmeth;
  const unpaid=subm.filter(needsMethod);
- const bad=p=>p.items.filter(i=>g.sold.includes(i.id));
+ const bad=p=>p.items.filter(i=>g.sold.includes(i.id)||(g.sold.includes(8)&&/milo|moki/i.test(i.name+' '+(i.o||''))));
  const pending=g.live&&!g.sent&&!g.cancelled;
  const orderingOpen=()=>pending&&!g.closed&&Date.now()<g.deadlineAt;
  const canEdit=()=>me.in&&orderingOpen();
@@ -289,10 +294,10 @@ function App(){
  };
  const addToCart=()=>{
   if(!canEdit())return say('Ordering is closed');
-  if(g.sold.includes(sheet.m.id))return say('This item is unavailable');
-  const s=sheet,iced=s.temp.startsWith('Iced'),extra=(s.m.set||s.m.dr)&&iced?0.6:0;
-  const o=s.m.set?`${s.drink}${s.sw!=='Normal'?', '+s.sw.toLowerCase():''}${iced?', iced':''}`:s.m.dr?`${s.sw}${iced?', iced':', hot'}`:'As served';
-  setItems(c=>{const i=c.findIndex(x=>x.id===s.m.id&&x.o===o);if(i>=0)return c.map((x,k)=>k===i?{...x,q:x.q+s.q}:x);return [...c,{id:s.m.id,name:s.m.name,o,q:s.q,p:s.m.price+extra}]});
+  const s=sheet,o=s.m.set?s.drink+', '+s.sw.toLowerCase():s.m.dr?s.sw:'As served';
+  const item={id:s.m.id,name:s.m.name,o,q:s.q,p:itemPrice(s.m,s.drink)};
+  if(bad({items:[item]}).length)return say('This item is unavailable');
+  setItems(c=>{const i=c.findIndex(x=>x.id===item.id&&x.o===o);if(i>=0)return c.map((x,k)=>k===i?{...x,q:x.q+s.q}:x);return [...c,item]});
   setSheet(null);say('Added to your order',1,1500);
  };
  const submit=()=>{
@@ -399,7 +404,7 @@ function App(){
   const m=h.orders[uid];
   if(!editable)return say('Join or start an open group first');
   if(!m)return say("You didn't order in that group");
-  setItems(()=>m.items.map(i=>({...i})));setSheet(null);setScr('cart');say('Previous order loaded. Change anything you like.');
+  setItems(()=>m.items.map(repriceItem).filter(Boolean));setSheet(null);setScr('cart');say('Previous order loaded at current menu prices. Change anything you like.');
  };
 
  const tot={};subm.forEach(p=>{p.items.forEach(i=>{const t=tot[i.name]||(tot[i.name]={q:0,v:{}});t.q+=i.q;t.v[i.o]=(t.v[i.o]||0)+i.q});const f=freeOf(p);if(f){const t=tot[f.free]||(tot[f.free]={q:0,v:{}});t.q+=1;t.v['Free reward']=(t.v['Free reward']||0)+1}});
@@ -526,9 +531,10 @@ function App(){
 
   {screen==='menu'&&<>
    {g.live&&g.closed&&<Ban c="e">Ordering is closed for this group.</Ban>}
-   <div className="chips" style={{marginBottom:12}}>{['Sets','Toast','Drinks'].map(c=><button key={c} className={'chip '+(cat===c?'on':'')} onClick={()=>setCat(c)}>{c}</button>)}</div>
-   {MENU.filter(m=>m.cat===cat).map(m=>{const out=g.sold.includes(m.id);return <div className="card row" key={m.id} style={{opacity:out?.6:1}}><div className="em">{m.img?<img src={m.img} alt={m.name}/>:<Icon n={m.e} s={28}/>}</div><div className="sp"><b>{m.name}</b><div className="mute">{m.desc}</div><b style={{color:'var(--red)'}}>{$(m.price)}</b> {out&&<Tag c="w">Unavailable</Tag>}</div>
-    <button className="add" disabled={!editable||out} aria-label={'Add '+m.name} onClick={()=>setSheet({k:'item',m,drink:'Kopi',sw:'Normal',temp:'Hot',q:1})}>+</button></div>})}
+   <label className="l" htmlFor="menu-category">Menu category</label>
+   <select id="menu-category" className="menu-select" value={cat} onChange={e=>setCat(e.target.value)}>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select>
+   {MENU.filter(m=>m.cat===cat).map(m=>{const out=bad({items:[m]}).length>0;return <div className="card row menu-card" key={m.id} style={{opacity:out?.6:1}}><div className="em"><MenuImage item={m}/></div><div className="sp"><b>{m.name}</b><div className="mute">{m.desc}</div><b style={{color:'var(--red)'}}>{m.set?'From ':''}{$(m.price)}</b> {out&&<Tag c="w">Unavailable</Tag>}</div>
+    <button className="add" disabled={!editable||out} aria-label={'Add '+m.name} onClick={()=>setSheet({k:'item',m,drink:SET_DRINKS[0].name,sw:'Normal',q:1})}>+</button></div>})}
    {!editable&&!(g.live&&me.in)&&<div className="card row"><div className="sp mute">{g.live&&!g.cancelled?'Join '+g.name+' to add items.':isOrg?'Start a group order to add items.':'Join a group order to add items.'}</div>{g.live&&!g.cancelled?<button className="btn sm" onClick={()=>setScr('join')}>View invitation</button>:isOrg&&<button className="btn sm" onClick={newOrder}>Start</button>}</div>}
    {cart.items.length>0&&<div className="sticky"><button className="btn" onClick={()=>setScr('cart')}>View my order · {$(sum(cart.items))}</button></div>}
   </>}
@@ -542,7 +548,7 @@ function App(){
    {cart.items.length===0&&<div className="card"><div className="mute">{dirty?'Update your order to withdraw your submitted items.':'Your order is empty. Browse the menu to add items.'}</div><button className="btn ghost sm" style={{marginTop:10}} disabled={!editable||!myHist.length} onClick={()=>reorder(myHist[0])}>Reorder my last order</button></div>}
    {cart.items.map((c,i)=><div className="card" key={i}><div className="row"><div className="sp"><b>{c.name}</b>{optTxt(c.o)&&<div className="mute">{optTxt(c.o)}</div>}</div>
     <div className="qty"><button disabled={!editable} onClick={()=>setItems(x=>x.map((y,k)=>k===i?{...y,q:y.q-1}:y).filter(y=>y.q>0))}>−</button><b>{c.q}</b><button disabled={!editable} onClick={()=>setItems(x=>x.map((y,k)=>k===i?{...y,q:y.q+1}:y))}>+</button></div><b style={{width:56,textAlign:'right'}}>{$(c.p*c.q)}</b></div>
-    {g.sold.includes(c.id)&&<div style={{color:'var(--red)',fontWeight:700,fontSize:13,marginTop:6}}>Unavailable at this outlet. Remove it to continue.</div>}</div>)}
+    {bad({items:[c]}).length>0&&<div style={{color:'var(--red)',fontWeight:700,fontSize:13,marginTop:6}}>Unavailable at this outlet. Remove it to continue.</div>}</div>)}
    {cart.items.length>0&&<>
     <div className="card"><div className="row"><b className="sp">Cherish reward</b><span className="mute">{me.pts} points</span></div>
      {rw(cart)?<div className="opt on" style={{margin:'10px 0 0'}}><b>{rw(cart).t} applied</b><div className="mute">Uses {rw(cart).cost} points from your account, taken when the group order is sent.</div>{freeOf(cart)&&<div className="mute">One free {freeOf(cart).free} is added to your order.</div>}{editable&&<button className="link" onClick={()=>setReward(null)}>Remove reward</button>}</div>
@@ -674,12 +680,11 @@ function App(){
 
   {sheet&&<div className={"sheet-bg"+(sheet.k==='demo'?' bottom':'')} onClick={()=>setSheet(null)}><div className={"sheet"+(sheet.k==='demo'?' bottom':'')} onClick={e=>e.stopPropagation()}>
    {sheet.k==='item'&&<>
-    <div className="row"><div className="em">{sheet.m.img?<img src={sheet.m.img} alt={sheet.m.name}/>:<Icon n={sheet.m.e} s={28}/>}</div><div className="sp"><b style={{fontSize:18}}>{sheet.m.name}</b><div className="mute">{sheet.m.desc}</div></div></div>
-    {sheet.m.set&&<><label className="l">Drink</label><div className="chips">{['Kopi','Kopi O','Teh','Teh O'].map(d=><button key={d} className={'chip '+(sheet.drink===d?'on':'')} onClick={()=>setSheet({...sheet,drink:d})}>{d}</button>)}</div></>}
-    {(sheet.m.set||sheet.m.dr)&&<><label className="l">Sweetness</label><div className="chips">{['Normal','Less sweet','Kosong'].map(d=><button key={d} className={'chip '+(sheet.sw===d?'on':'')} onClick={()=>setSheet({...sheet,sw:d})}>{d}</button>)}</div>
-    <label className="l">Temperature</label><div className="chips">{['Hot','Iced (+ $0.60)'].map(d=><button key={d} className={'chip '+(sheet.temp===d?'on':'')} onClick={()=>setSheet({...sheet,temp:d})}>{d}</button>)}</div></>}
+    <div className="row menu-card"><div className="em"><MenuImage item={sheet.m}/></div><div className="sp"><b style={{fontSize:18}}>{sheet.m.name}</b><div className="mute">{sheet.m.desc}</div></div></div>
+    {sheet.m.set&&<><label className="l" htmlFor="set-drink">Drink</label><select id="set-drink" className="menu-select" value={sheet.drink} onChange={e=>setSheet({...sheet,drink:e.target.value})}>{SET_DRINKS.map(d=><option key={d.name} value={d.name}>{d.name}{d.extra?' (+ '+$(d.extra)+')':' (included)'}</option>)}</select></>}
+    {(sheet.m.set||sheet.m.dr)&&<><label className="l">Sweetness</label><div className="chips">{['Normal','Less sweet','More sweet','Kosong'].map(d=><button key={d} className={'chip '+(sheet.sw===d?'on':'')} onClick={()=>setSheet({...sheet,sw:d})}>{d}</button>)}</div></>}
     <div className="row" style={{marginTop:18}}><div className="qty"><button onClick={()=>setSheet({...sheet,q:Math.max(1,sheet.q-1)})}>−</button><b>{sheet.q}</b><button onClick={()=>setSheet({...sheet,q:sheet.q+1})}>+</button></div>
-    <button className="btn sp" onClick={addToCart}>Add to order · {$((sheet.m.price+((sheet.m.set||sheet.m.dr)&&sheet.temp.startsWith('Iced')?0.6:0))*sheet.q)}</button></div></>}
+    <button className="btn sp" onClick={addToCart}>Add to order · {$(itemPrice(sheet.m,sheet.drink)*sheet.q)}</button></div></>}
    {sheet.k==='rewards'&&<><b style={{fontSize:18}}>Your Cherish rewards</b><div className="mute" style={{marginBottom:10}}>Rewards apply only to your own items.</div>
     {REWARDS.map(r=>{const okp=me.pts>=r.cost,okm=sum(draft.items)>=r.min;return <div key={r.id} className={'opt '+(okp?'':'dis')} onClick={()=>{if(!okp)return;if(!okm){say('Spend '+$(r.min)+' or more to use '+r.t,1);return}setReward(r.id)}}><div className="row"><b className="sp">{r.t}</b>{okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.free?'Adds one free '+r.free+' · ':''}{r.cost} points{okp&&!okm?' · add '+$(r.min-sum(draft.items))+' more to your order to use it':''}</div></div>})}</>}
    {sheet.k==='slot'&&<><b style={{fontSize:20}}>Pickup time and group size</b>
