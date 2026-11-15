@@ -196,7 +196,9 @@ Implement the agreed demo retention and deletion rules for order history and sav
 
 ### A14 Architecture and repository documentation
 
-**Status** Pending; finish after behaviour stabilises.
+**Status** Complete. Delivery commit: `Document final architecture, mock data and report acceptance`.
+
+**Verification** README reconciled; actual architecture documented with diagram; backend boundary and reproducible mock-data exports added. Snapshot check passes. Final local-link check is recorded with the media handoff.
 
 **Requirement** Assigned GitHub work and the report's temporary Technology & Functional MVP section.
 
@@ -206,7 +208,9 @@ Document the actual architecture, React/Vite stack and mock data or backend boun
 
 ### A15 Report acceptance walkthrough
 
-**Status** Pending; depends on functional items.
+**Status** Complete. Delivery commit: `Document final architecture, mock data and report acceptance`.
+
+**Verification** All 50 automated checks pass, including the full Mary/Ben/Calvin customisation/reward/payment/collection/reuse journey and required failure recovery. Requirement matrix and agreed deviations are in docs/acceptance/report-alignment.md.
 
 **Requirement** Section 4.4 and FR-01–FR-11 / US-01–US-12.
 
@@ -216,7 +220,7 @@ Run one organiser and at least two participants through creation, invitation, cu
 
 ### A16 Wireframes and full demonstration
 
-**Status** Pending; depends on A14–A15.
+**Status** In progress: capturing the tested screens, captions and demonstration video.
 
 **Requirement** Assigned Section 4.5 and presentation video work.
 
@@ -237,4 +241,4 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 
 For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-The next implementation item is A12, joining notice and marketing consent. Unresolved policy details remain recorded above for discussion.
+Functional implementation and report acceptance are complete. A16 media capture and the final documentation-link check are in progress. Agreed report wording differences remain recorded above.

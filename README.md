@@ -1,115 +1,100 @@
-# Ya Kun Together (SC4025 group project)
+# Ya Kun Together — SC4025 project
 
-## How to run the frontend
+A React/Vite presentation MVP for group ordering. Mary Ng organises the group; participants choose their own food, confirm their own mock cards and earn personal Cherish points after collection.
 
-All commands below are run in a terminal.
+## Start the app
 
-**Step 1: Go into the project folder.**
-Open a terminal in the folder where you cloned this repository.
+From the repository folder:
 
-**Step 2: Go into the `frontend` folder.**
-
-```
+```sh
 cd frontend
-```
-
-**Step 3: Install the dependencies.**
-
-```
 npm install
-```
-
-**Step 4: Start the application.**
-
-```
 npm run dev
 ```
 
-**Step 5: Open the application.**
-The terminal prints a link such as `http://localhost:XXXX`. Open it in your browser, the app is shown inside a phone frame.
+Open the local address printed by the terminal. Keep that terminal running. Stop it with Ctrl+C. There is no separate backend to start.
 
-To stop the app, press `Ctrl + C` in the terminal.
+With the existing dependencies, these direct Node commands also work when npm is unavailable:
 
-## Demo accounts and controls
+```sh
+cd frontend
+node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5173 --strictPort
+```
 
-Sign in as `maryng@yakun.demo` with password `kaya1234` to use the organiser account. The participant account `ben@yakun.demo` uses the same password.
+For a built preview:
 
-After signing in, select the name at the top right to switch demo users or simulate deadlines, stock changes, full pickup slots, declined payments and outlet status updates.
+```sh
+npm run build
+npm run preview
+```
 
-Orders, card charges and account balances are simulated in the browser. Refreshing resets the demo.
+If the site cannot be reached, restart the server and use the exact address/port shown by its terminal. A closed terminal stops the local site.
 
-## Payment scope
+## Demo accounts
 
-Everyone pays for their own submitted items using their selected mock card. Choosing a card does not charge it: each person's payment is charged when the organiser sends the group order to the outlet. Missing payment methods or declined payments block sending.
+All accounts use password **kaya1234**.
 
-The latest report (FR-05, Table 4.3 and Section 4.4) supersedes the earlier decision to offer organiser sponsorship. New groups, including those created from saved groups, use individual payments. Older sponsored receipts remain readable.
+| Person | Email | Role | Default / alternative card endings |
+| --- | --- | --- | --- |
+| Mary Ng | maryng@yakun.demo | Organiser | 1111 / 8008 |
+| Ben | ben@yakun.demo | Participant | 2222 / 8018 |
+| Calvin | calvin@yakun.demo | Participant | 3333 / 8028 |
 
-See [the payment decision and test steps](docs/improvements/01-payment-choice.md).
+After signing in, use the name at the top right to switch users and open demo controls. Those controls simulate deadline expiry, unavailable Milo, a full collection slot, declined cards, outlet progress and retention expiry.
 
-## Loyalty points
+Everything is simulated in the current browser tab. Refresh restores fixtures. Invitation links open against this same running tab; another device or a fresh tab has no shared group data.
 
-For ordinary pickup, each person earns 8 Cherish points per $1 actually paid after their personal reward discount, rounded down to whole points. A $6.30 payment earns 50 points; a $4.30 payment earns 34 points. Group membership and capacity do not change the award.
+## Current behaviour
 
-Points are credited only when the organiser marks the order collected. New receipts record the baseline rate and earned points. Older recorded awards and group multipliers remain intact in history.
+| Area | Implemented behaviour |
+| --- | --- |
+| Group setup | Expected capacity 2–10, never below joined membership; countdown and one full 15-minute extension |
+| Invitations | Mary invites named accounts; each participant presses Join group. Saved groups send pending invitations to their listed members |
+| Menu | 74 items, six categories, 73 supplied screenshot pictures, set-drink supplements, sweetness and quantities |
+| Editing | Carts remain drafts until Submit my order / Update my order; participants cannot change someone else's items |
+| Payment | Individual payments only for new orders; two saved mock cards per account; no charge until a successful send |
+| Recovery | A decline leaves everyone uncharged. The affected person confirms the alternative card, then Mary retries. Duplicate sends cannot charge twice |
+| Privacy | Mary sees payment status without other people's card details. Participants see their own cards, failures, reminders and receipts |
+| Collection | Pickup has ASAP, three quick choices and a later dropdown. Advance mode reserves two hours beyond the planned deadline. Sending rechecks timing/capacity/stock and locks the selection |
+| Extension | One extension per group; collection stays fixed. Original advance qualification is retained through that extended deadline; a changed time must qualify afresh |
+| Points | Pickup: floor(personal payment after rewards × 8). Qualifying advance: floor(payment × 8 × 1.1). Round once; $6.30 earns 50 or 55 points. Credit once at collection |
+| Reminders | At two minutes remaining, target each joined person's missing order or card. Closing early checks missing cards immediately; no duplicate automatic reminder for that person/kind/deadline |
+| Consent | Joining disclosure plus separate marketing opt-in, unticked by default. Review/withdraw under More → Privacy and data. No marketing is sent |
+| Retention | Seven inactive days for completed history and saved groups. Leaving clears active data and related saved membership; earlier receipts and unrelated records are preserved until expiry |
+| Reuse | Owner-managed saved groups, rename/reuse and history reordering at current prices; old receipts keep their recorded values |
 
-This follows FR-06 and US-08 in the latest report and supersedes the earlier group-size multiplier. Qualifying advance orders now earn 10% extra points, rounded down once after the full calculation.
+The full consolidation and who-gets-what view remains after sending, as agreed. Confirmed editing, the extension exception and single-rounding policy are recorded as report discussion points in the acceptance document.
 
-See [the points calculation and test steps](docs/improvements/02-group-points.md).
+## Test and demonstrate
 
-## Pickup and advance orders
+Start with the [complete manual test guide](docs/testing-guide.md). It includes the exact actions and expected totals/points, plus short error/recovery tests.
 
-Choose **Pickup** for ASAP, three quick times and the later-time dropdown, or **Advance order** for later collection with at least two hours of preparation time. Choices account for the ordering window. ASAP means approximately 15–20 minutes after ordering closes.
+From frontend:
 
-Pickup requires at least 15 minutes from sending; advance orders normally require at least two hours. The app validates creation, replacement and sending against the timing and mock capacity rules. Next-day choices show Singapore dates, and sending locks the mode, outlet and collection time. History retains the chosen mode and time.
+```sh
+npm run test:collection
+npm run build
+npm run check:mock
+```
 
-One 15-minute extension per group preserves original advance qualification through the extended deadline, without changing collection time. Qualifying advance orders receive a 10% points bonus, preserved during that extension. Outlet opening hours are not modelled. The scheduling horizon remains 24 hours.
+Direct equivalents when dependencies are already installed:
 
-See [collection rules and manual test steps](docs/improvements/04-pickup-times.md). From `frontend`, rerun the automated collection checks with `npm run test:collection` and build with `npm run build`.
+```sh
+node --test tests/collection-flow.test.mjs
+node node_modules/vite/bin/vite.js build
+node scripts/export-mock-data.mjs --check
+```
 
-## Deadline extension
+The controlled-clock checks cover multi-hour timing, reminders and seven-day expiry without real waits. See [acceptance results](docs/acceptance/report-alignment.md) for coverage and agreed deviations.
 
-Mary can extend once per group by a full 15 minutes. Collection stays unchanged. Originally qualifying advance orders can still be sent during the extension even after crossing the normal two-hour boundary. Changing the collection time requires fresh qualification, and an extension cannot reach or pass collection.
+## Report and repository references
 
-See [the extension rules, noon example and test steps](docs/improvements/05-deadline-extension.md). Automated checks run with `npm run test:collection` from `frontend`.
+- [Implemented architecture and technology](docs/architecture/README.md), with [an insertable SVG diagram](docs/architecture/architecture.svg).
+- [Backend boundary](backend/README.md) and [generated mock-data reference](backend/mock-data/README.md). The running application uses frontend/src/data.js; export reference snapshots with npm run export:mock after changing fixtures.
+- [Section 4.5 screen captures and captions](docs/report/4.5-wireframes.md).
+- [Demonstration video and script](docs/demo/README.md).
+- [Requirement alignment and work checklist](docs/report-alignment-backlog.md).
+- [Menu prices, picture sources and authorised estimates](docs/improvements/03-menu-catalogue.md).
+- [Pickup rules](docs/improvements/04-pickup-times.md), [extension](docs/improvements/05-deadline-extension.md), [bonus](docs/improvements/06-advance-points.md), [card recovery](docs/improvements/07-payment-recovery.md), [privacy](docs/improvements/08-payment-privacy.md), [invitations](docs/improvements/09-invitations.md), [reminders](docs/improvements/10-automatic-reminders.md), [consent](docs/improvements/11-joining-consent.md) and [retention](docs/improvements/12-retention.md).
 
-## Advance-order points bonus
-
-Qualifying advance orders earn 10% extra points on each person's actual payment after rewards. Round down once after multiplying the payment by 8 and 1.1: $6.30 earns 55 points, while ordinary pickup earns 50. Group size does not change the rate.
-
-The cart and payment screen explain eligibility before submission. The applied bonus is fixed when the organiser sends, preserved through the approved extension exception, and credited once at collection. History records the bonus and personal award. Cancelling earns no points.
-
-See [the formula, eligibility and test steps](docs/improvements/06-advance-points.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.
-
-## Saved cards and declined payments
-
-Each demo account has two saved mock cards. If sending is declined, nobody is charged. The affected person confirms their alternative card, then the organiser retries. Declined cards remain unavailable for that order.
-
-Successful sending charges each person's own total once. Personal receipts and history retain the selected card. Mary has cards ending 1111 and 8008; Ben has 2222 and 8018. All cards and charges are simulated.
-
-See [the payment recovery guide and test steps](docs/improvements/07-payment-recovery.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.
-
-## Payment status privacy
-
-Mary can see each participant's payment readiness or decline, without their card details. Each participant sees their own payment status, cards, decline notifications and receipts. Other participants do not see a named failure or another person's card details.
-
-Switching demo accounts clears temporary payment messages and receipts. Payment simulation controls show participants only their own account; Mary can simulate the group members' payments.
-
-See [the visibility rules and manual test steps](docs/improvements/08-payment-privacy.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.
-
-## Invitations and joining
-
-Mary invites named accounts through **Group → Invite people**. Switch to the invited participant, open the invitation from Home or **Order → View invitation**, then select **Join group**. Inviting someone does not join them automatically. Saved groups invite only their listed members.
-
-Non-invited accounts cannot join. Removed members need a fresh invitation; people who leave can rejoin while ordering is open and there is room. Full, expired, closed, cancelled and sent invitations explain the problem.
-
-Links point to this app and open the invitation in the same running demo tab. New tabs, refreshes and other devices have no shared order state. Clipboard failures offer the link for manual copying instead of reporting success.
-
-See [the invitation flow and test steps](docs/improvements/09-invitations.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.
-
-## Automatic reminders
-
-At two minutes before the deadline, joined non-submitters receive an order reminder and submitted participants missing a valid payment method receive a payment reminder. Ready accounts, zero-pay orders and people who have not joined are skipped. Closing early immediately checks outstanding payment methods.
-
-Automatic reminders are personal and sent once per person, kind and deadline. An extension starts a new reminder window. Sending or cancellation stops delivery, and old timers cannot affect a changed deadline or replacement group. Manual reminders remain available.
-
-See [the reminder rules and test steps](docs/improvements/10-automatic-reminders.md). From `frontend`, rerun `npm run test:collection` and `npm run build`; controlled-clock checks avoid waiting through real deadlines.
+The latest report supersedes the earlier organiser-sponsored payment and group-size multiplier proposals. Legacy receipts retain their recorded awards. Some menu prices/supplements are authorised estimates. Outlet capacities are mock data; opening hours and real payments are outside this MVP. No dependency/security upgrade was added as part of these presentation changes.

@@ -1,0 +1,35 @@
+[
+  {
+    "n": "Ya Kun – Far East Square",
+    "w": "8 minutes",
+    "caps": [
+      4,
+      12,
+      12,
+      12
+    ],
+    "laterCap": 12
+  },
+  {
+    "n": "Ya Kun – NTU North Spine",
+    "w": "12 minutes",
+    "caps": [
+      12,
+      4,
+      12,
+      12
+    ],
+    "laterCap": 12
+  },
+  {
+    "n": "Ya Kun – Marina Bay Link Mall",
+    "w": "5 minutes",
+    "caps": [
+      3,
+      3,
+      12,
+      12
+    ],
+    "laterCap": 12
+  }
+]
