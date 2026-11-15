@@ -9,7 +9,7 @@ Work proceeds one item at a time. Each item should have its implementation, rele
 - The menu expansion, group multiplier and pickup selector were previously pushed on `feature/group-presentation-updates`.
 - The report supersedes the earlier decisions to offer organiser sponsorship and award a group-size points bonus.
 - The group-capacity correction is complete under A01 and has passed focused checks and a production build.
-- The README expansion and payment-choice decision note are local drafts. Their older descriptions of sponsorship and group-size points need reconciliation with this backlog.
+- The README expansion remains a local draft. Its payment section is reconciled under A03; its group-size points description will be reconciled under A04.
 - The governance controls are now included in the implementation scope following Yi Xiang's confirmation on 16 November 2026.
 
 ## Decisions to preserve
@@ -52,7 +52,9 @@ Rename the organiser consistently across the account, user switcher, notificatio
 
 ### A03 Individual payment scope
 
-**Status** Pending.
+**Status** Complete. Delivery commit: `Use individual payments for new group orders`.
+
+**Verification** Production build passed. Actual React handler checks passed for fixed creation (including stale sponsorship state), Mary/Ben/Calvin selecting their own cards without immediate charges, sending three $6.30 personal payments, individual-payment history and legacy sponsored receipts.
 
 **Requirement** FR-05, Table 4.3 and Section 4.4.
 
@@ -213,4 +215,4 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 
 For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-The next implementation item is A03, individual payment scope. Unresolved policy details remain recorded above for discussion.
+The next implementation item is A04, baseline loyalty points. Unresolved policy details remain recorded above for discussion.

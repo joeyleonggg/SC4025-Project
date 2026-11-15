@@ -235,7 +235,7 @@ function App(){
    setG(x=>({...x,...slotSet(),slot:''}));setStep(2);return say('Choose a later pickup time');
   }
   if(at>=slotAt)return say('Choose a shorter ordering time or a later pickup');
-  setG(x=>({...x,live:true,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
+  setG(x=>({...x,pay:'individual',live:true,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
   const inv=P.filter(x=>!x.org&&preset.includes(x.n)).slice(0,g.size-1).map(x=>x.id); // only the saved group's members; a new team starts with just the organiser
   setP(p=>p.map(x=>inv.includes(x.id)?{...x,in:1}:x));
   if(inv.length){note('Invitations sent for '+g.name,'mail',[0]);note(org.n+' invited you to '+g.name,'mail',inv);}
@@ -455,7 +455,7 @@ function App(){
   {tab==='order'&&isOrg&&g.expired&&!g.sent&&!g.cancelled&&<div className="card"><b>Time is up</b><div className="mute" style={{margin:'6px 0 14px'}}>{subm.length} of {members.length} people submitted.</div>{expiredBtns}</div>}
 
   {screen==='home'&&<>
-   {isOrg&&<div className="hero"><h2>Breakfast for the whole team, one order.</h2><p className="mute" style={{marginBottom:14}}>Everyone picks their own food. Pay your own way and earn your own Cherish points, or let the organiser pay for the group.</p>{(()=>{const active=g.live&&!g.cancelled&&!(g.sent&&g.status==='collected');return <button className="btn" onClick={()=>active?setScr(g.sent?'done':'group'):newOrder()}>{active?(g.sent?'View my group order':'Open my group order'):'Start Ya Kun Together'}</button>})()}</div>}
+   {isOrg&&<div className="hero"><h2>Breakfast for the whole team, one order.</h2><p className="mute" style={{marginBottom:14}}>Everyone picks their own food, pays for their own order and earns their own Cherish points.</p>{(()=>{const active=g.live&&!g.cancelled&&!(g.sent&&g.status==='collected');return <button className="btn" onClick={()=>active?setScr(g.sent?'done':'group'):newOrder()}>{active?(g.sent?'View my group order':'Open my group order'):'Start Ya Kun Together'}</button>})()}</div>}
    <div className="card row"><div className="av"><Icon n="star"/></div><div className="sp"><b>Cherish account</b><div className="mute">{me.n} · linked</div></div><div style={{textAlign:"right"}}><div className="big" style={{fontSize:26}}>{avail}</div></div></div>
    {g.live&&me.in?<div className="card click" onClick={()=>setScr(g.sent?'done':'group')} style={{borderColor:'var(--red)'}}><b>{g.name}</b><div className="mute">{statusText}{!g.closed&&!g.sent&&!g.cancelled&&<ClosesIn target={g.deadlineAt}/>}</div></div>
     :g.live&&!g.cancelled?<div className="card click" onClick={()=>setScr('join')} style={{borderColor:'var(--red)'}}><b>{org.n} invited you to {g.name}</b><div className="mute">Tap to view the invitation</div></div>
@@ -497,9 +497,8 @@ function App(){
     <label className="l">How long can people order?</label>
     <div className="chips">{[5,10,15,30].map(m=>{const late=Date.now()+m*60000>=slotAt;return <button key={m} disabled={late} className={'chip '+(g.win===m&&!late?'on':'')} onClick={()=>setG({...g,win:m})}>{m} minutes</button>})}</div>
     <div className="mute" style={{marginTop:10}}>Ordering closes at {tm(Date.now()+g.win*60000)}. Everyone sees a countdown and gets a reminder.</div>
-    <label className="l">Who pays?</label>
-    <div className={'opt '+(g.pay==='individual'?'on':'')} onClick={()=>setG({...g,pay:'individual'})}><b>Everyone pays for their own</b></div>
-    <div className={'opt '+(g.pay==='sponsor'?'on':'')} onClick={()=>setG({...g,pay:'sponsor'})}><b>I will pay for everyone</b></div>
+    <label className="l">Payment</label>
+    <div className="card"><b>Everyone pays for their own order</b><div className="mute" style={{marginTop:6}}>Each person chooses their own saved card. Cards are charged only when the organiser sends the group order to the outlet.</div></div>
     <div className="sticky"><button className="btn" onClick={createGroup}>Create group</button></div>
    </>}
    {step===4&&<>
