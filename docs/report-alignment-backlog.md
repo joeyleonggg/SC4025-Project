@@ -170,7 +170,9 @@ Keep targeted order-submission reminders and add automatic reminders for members
 
 ### A12 Joining notice and marketing consent
 
-**Status** Pending; depends on the joining flow in A10.
+**Status** Complete. Delivery commit: `Add joining disclosure and optional marketing consent`.
+
+**Verification** Disclosure precedes joining; consent is unticked and optional, isolated per account, and withdrawable. Two automated cases added.
 
 **Requirement** Sections 5.5 and 5.6, Table 5.4.
 

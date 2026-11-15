@@ -121,6 +121,7 @@ function App(){
  const [step,setStep]=useState(1);
  const [banners,setBanners]=useState([]);
  const [inviteRequest,setInviteRequest]=useState(readInviteKey);
+ const [marketingChoice,setMarketingChoice]=useState(false);
  const nid=useRef(0), toastT=useRef(null), Pr=useRef(null),Gr=useRef(null);
  const collectedGroup=useRef(null),sentGroup=useRef(null);
  const reminderLedger=useRef(new Set()),viewer=useRef({id:uid,screen:scr});
@@ -211,15 +212,15 @@ function App(){
  const invState=invitationStatus();
  const invitationMessages={unavailable:'This group is not available in this demo tab. Use the tab where it was created; a new tab or refresh has no shared order data.',invalid:'This invitation belongs to a different or previous group. Ask the organiser for the current invitation.', 'not-invited':'This account has not been invited. Ask the organiser for an invitation to your account.',removed:'You were removed from this group. The organiser must invite you again before you can rejoin.',cancelled:'This group was cancelled. Its invitation can no longer be used.',sent:'This group order has already been sent. New members cannot join.',expired:'This invitation has expired. Ask the organiser to restore invitations or start a new group.',closed:'Ordering has closed. Ask the organiser whether an extension is available.',full:'This group is full. Ask the organiser to increase the group size or free a place.',joined:'You have already joined this group.'};
  const inviteUrl=(typeof window==='undefined'?'http://localhost:5173/':window.location.origin+window.location.pathname)+'#invite='+encodeURIComponent(g.inviteKey);
- const openInvite=()=>{setInviteRequest(g.inviteKey);setScr('join')};
+ const openInvite=()=>{setMarketingChoice(false);setInviteRequest(g.inviteKey);setScr('join')};
  useEffect(()=>{
   if(typeof window==='undefined')return;
-  const open=()=>{setInviteRequest(readInviteKey());setScr(current=>current==='login'?'login':'join')};
+  const open=()=>{setMarketingChoice(false);setInviteRequest(readInviteKey());setScr(current=>current==='login'?'login':'join')};
   window.addEventListener('hashchange',open);return()=>window.removeEventListener('hashchange',open);
  },[]);
  const GATED=['group','cart','track','done','pay','paid'];
  const screen=!me.in&&GATED.includes(scr)?'gate':scr;
- const TAB={gate:'order',join:'order',home:'home',create:'home',menu:'order',cart:'order',group:'order',track:'order',done:'order',wallet:'pay',pay:'pay',paid:'pay',rewards:'rewards',more:'more',repeat:'more',notifs:'more'};
+ const TAB={gate:'order',join:'order',home:'home',create:'home',menu:'order',cart:'order',group:'order',track:'order',done:'order',wallet:'pay',pay:'pay',paid:'pay',rewards:'rewards',more:'more',privacy:'more',repeat:'more',notifs:'more'};
  const tab=TAB[screen];
  // Notifications belong to specific people. Each one lists who receives it, and "seen" is tracked per person.
  const myNotes=notes.filter(x=>x.to.includes(uid));
@@ -243,7 +244,7 @@ function App(){
  const login=()=>{
   const acc=ACCOUNTS.find(a=>a.identifier.toLowerCase()===idf.trim().toLowerCase());
   if(!acc||acc.password!==pwd){setLoginErr('Incorrect email or password.');return}
-  setLoginErr('');setUid(acc.id);setScr(inviteRequest?'join':'home');
+  setLoginErr('');setUid(acc.id);setMarketingChoice(false);setSheet(null);setScr(inviteRequest?'join':'home');
  };
  // note(text, icon, to): `to` = the user ids who receive it (default: everyone currently in the group).
  const note=(t,i='bell',to)=>{
@@ -342,7 +343,7 @@ function App(){
   const n=hist.filter(h=>h.s).length+(arch?1:0);
   setG({...freshG(n),...(name?{name}:{}),...(members?{size:Math.min(MAXSIZE,Math.max(2,members.length))}:{})});
   setPreset(members||[]);
-  setP(p=>p.map(x=>({...blank(USERS0[x.id]),pts:x.pts,hist:x.hist})));
+  setP(p=>p.map(x=>({...blank(USERS0[x.id]),pts:x.pts,hist:x.hist,marketingOptIn:x.marketingOptIn,marketingUpdatedAt:x.marketingUpdatedAt})));
   setStep(1);setScr('create');
  };
  const startFrom=s=>{
@@ -357,7 +358,7 @@ function App(){
  };
  const join=()=>{
   if(invitationStatus(Date.now(),uid,Gr.current,Pr.current)!=='valid')return;
-  setP(p=>p.map(x=>x.id===uid?{...x,in:1,left:0}:x));
+  setP(p=>p.map(x=>x.id===uid?{...x,in:1,left:0,marketingOptIn:marketingChoice,marketingUpdatedAt:Date.now()}:x));
   note(me.n+' joined '+g.name,'users',[...mem(),uid]);setScr('group');say('You joined '+g.name);
  };
  const leave=()=>{
@@ -533,8 +534,8 @@ function App(){
  };
 
  const tot={};subm.forEach(p=>{p.items.forEach(i=>{const t=tot[i.name]||(tot[i.name]={q:0,v:{}});t.q+=i.q;t.v[i.o]=(t.v[i.o]||0)+i.q});const f=freeOf(p);if(f){const t=tot[f.free]||(tot[f.free]={q:0,v:{}});t.q+=1;t.v['Free reward']=(t.v['Free reward']||0)+1}});
- const T={gate:'Order',home:'Ya Kun Together',create:'New group order',group:'Order',menu:'Order',cart:'Order',track:'Order',done:'Order',pay:'Payment',paid:'Payment confirmed',wallet:'Pay',rewards:'Rewards',more:'More',repeat:'Saved and previous',notifs:'Notifications',join:'Group invitation'};
- const back={join:'home',create:'home',pay:'wallet',paid:'track',repeat:'more',notifs:'more'};
+ const T={gate:'Order',home:'Ya Kun Together',create:'New group order',group:'Order',menu:'Order',cart:'Order',track:'Order',done:'Order',pay:'Payment',paid:'Payment confirmed',wallet:'Pay',rewards:'Rewards',privacy:'Privacy and data',more:'More',repeat:'Saved and previous',notifs:'Notifications',join:'Group invitation'};
+ const back={join:'home',create:'home',pay:'wallet',paid:'track',repeat:'more',privacy:'more',notifs:'more'};
  const goBack=()=>{if(screen==='create'&&step>1&&step<4)setStep(step-1);else setScr(back[screen])};
  const expiredBtns=<div className="col"><button className="btn" disabled={!canExtend(Date.now())} onClick={extend}>Add 15 more minutes</button><button className="btn ghost" disabled={subm.length===0} onClick={()=>{setSheet(null);setG(x=>({...x,expired:false}));setScr('track')}}>Continue with {subm.length} order{subm.length===1?'':'s'}</button><button className="link danger" onClick={()=>setSheet({k:'cancel'})}>Cancel group order</button></div>;
  const pstat=p=>!canSeePayment(p)?null:g.pay==='sponsor'?<Tag c="ok">Organiser pays</Tag>:g.sent&&p.sub&&p.paid?<Tag c="ok">Paid</Tag>:p.payFail&&!g.sent?<Tag c="w">Payment declined</Tag>:!p.sub?<Tag>–</Tag>:owed(p)===0?<Tag c="ok">Nothing to pay</Tag>:p.pmeth?<Tag c="ok">Payment ready</Tag>:<Tag c="w">Payment method needed</Tag>;
@@ -632,6 +633,7 @@ function App(){
     {invState==='valid'&&<p className="mute">Deadline {g.deadline} · {collectionName} · {outlet.n} · collect at {g.slot}<br/>Everyone pays for their own order</p>}</div>
    {!!me.left&&hasInvite&&<Ban>You left this group. You can rejoin while ordering is open and a place is available.</Ban>}
    {invitationMessages[invState]&&<Ban c={invState==='joined'?'k':'e'}>{invitationMessages[invState]}</Ban>}
+   {invState==='valid'&&<div className="card"><b>Before you join</b><p className="mute">Group members see your name. Mary sees your submitted items, subtotal and payment readiness or decline. Submitted items appear in the collection breakdown after sending. Your saved cards and card-specific messages stay private.</p><p className="mute">Completed history and saved groups expire after 7 days of inactivity. Leaving clears your active order and saved membership for this group; earlier receipts remain until expiry.</p><label className="row" style={{alignItems:'flex-start',gap:10}}><input type="checkbox" checked={marketingChoice} onChange={e=>setMarketingChoice(e.target.checked)} style={{width:20,minWidth:20,marginTop:2}}/><span>Send me optional marketing updates<div className="mute">Optional and separate from joining. You can change this under More → Privacy and data. This demo sends no marketing messages.</div></span></label></div>}
    <button className="btn" disabled={invState!=='valid'} onClick={join}>Join group</button>
    {!!me.in&&(invState==='joined'||invState==='sent')&&<button className="btn ghost" style={{marginTop:10}} onClick={()=>setScr(g.sent?'done':'group')}>{g.sent?'View collection details':'View group'}</button>}
   </>}
@@ -794,9 +796,13 @@ function App(){
     me.hist.map((h,i)=><div className="card row" key={i}><div className="sp"><b>{h.note}</b><div className="mute">{new Date(h.at).toLocaleDateString([],{day:'numeric',month:'short'})} · {new Date(h.at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</div></div><b style={{color:h.amt>=0?'var(--ok)':'var(--voucher)'}}>{h.amt>=0?'+ ':'− '}{Math.abs(h.amt)} points</b></div>)}
   </>}
 
+  {screen==='privacy'&&<>
+   <h2 className="ttl">Privacy and data</h2><div className="card"><b>What is shared</b><p className="mute">Group members see names and the submitted collection breakdown. The organiser sees submitted orders and payment status. Your card details and card-specific messages stay private.</p><b>Marketing preference</b><label className="row" style={{marginTop:12,gap:10}}><input type="checkbox" checked={!!me.marketingOptIn} onChange={e=>upd(uid,{marketingOptIn:e.target.checked,marketingUpdatedAt:Date.now()})} style={{width:20,minWidth:20}}/><span>Send me optional marketing updates</span></label><p className="mute">Joining does not require marketing consent. No marketing messages are sent by this demo.</p>{me.marketingUpdatedAt>0&&<div className="mute">Preference recorded {fdt(me.marketingUpdatedAt)}</div>}</div>
+   <div className="card"><b>Retention</b><p className="mute">Completed history and saved groups expire after 7 days of inactivity. Leaving clears your active order and saved membership for that group. Earlier completed receipts remain until expiry. Refreshing resets the demo separately from this retention policy.</p></div>
+  </>}
   {screen==='more'&&<>
    <div className="card row"><div className="av"><Icon n="star"/></div><div className="sp"><b>{me.n}</b><div className="mute">Cherish account linked · {avail} points</div></div></div>
-   {[['clock','Saved groups and previous orders',()=>setScr('repeat'),false],['bell','Notifications',()=>{markSeen();setScr('notifs')},hasNew],['gear','Demo controls',()=>setSheet({k:'demo'}),false],['door','Log out',()=>{setIdf('');setPwd('');setLoginErr('');setScr('login')},false]].map(([ic,l,f,dot])=><div className="card row click" key={l} onClick={f}><Icon n={ic}/><b className="sp">{l}</b>{dot&&<i className="dot-inline"/>}<Icon n="chev" s={16}/></div>)}
+   {[['lock','Privacy and data',()=>setScr('privacy'),false],['clock','Saved groups and previous orders',()=>setScr('repeat'),false],['bell','Notifications',()=>{markSeen();setScr('notifs')},hasNew],['gear','Demo controls',()=>setSheet({k:'demo'}),false],['door','Log out',()=>{setIdf('');setPwd('');setLoginErr('');setScr('login')},false]].map(([ic,l,f,dot])=><div className="card row click" key={l} onClick={f}><Icon n={ic}/><b className="sp">{l}</b>{dot&&<i className="dot-inline"/>}<Icon n="chev" s={16}/></div>)}
   </>}
 
   {screen==='notifs'&&<>{myNotes.length===0&&<div className="card mute">No notifications yet.</div>}{myNotes.map((n,i)=><div className="card row" key={i}><div className="em" style={{width:40,height:40}}><Icon n={n.i}/></div><div className="sp">{n.t}<div className="mute" style={{marginTop:2}}>{fdt(n.at)}</div></div></div>)}</>}
@@ -866,7 +872,7 @@ function App(){
    {sheet.k==='confirm'&&<><h2 className="ttl">{sheet.title}</h2><div className="mute" style={{marginBottom:18}}>{sheet.msg}</div><button className="btn" onClick={sheet.action}>{sheet.label}</button><button className="btn ghost" style={{marginTop:10}} onClick={()=>setSheet(null)}>Cancel</button></>}
    {sheet.k==='cancel'&&<><h2 className="ttl">Cancel this group order?</h2><div className="mute" style={{marginBottom:18}}>Everyone's items are removed and the invite link stops working.</div><button className="btn" onClick={cancelOrder}>Cancel group order</button><button className="btn ghost" style={{marginTop:10}} onClick={()=>setSheet(null)}>Keep order</button></>}
    {sheet.k==='demo'&&<><b style={{fontSize:18}}>Demo controls</b><div className="mute">For presenting the prototype only.</div>
-    <label className="l">Viewing as</label><div className="chips">{P.map(p=><button key={p.id} className={'chip '+(uid===p.id?'on':'')} onClick={()=>{setUid(p.id);setSheet(null);setToast('');setErr('');setReceipt(null);setSel('card');setPm('me');setOpen(null);if(scr!=='login')setScr('home')}}>{p.n}{p.org?' (organiser)':''}</button>)}</div>
+    <label className="l">Viewing as</label><div className="chips">{P.map(p=><button key={p.id} className={'chip '+(uid===p.id?'on':'')} onClick={()=>{setUid(p.id);setMarketingChoice(false);setSheet(null);setToast('');setErr('');setReceipt(null);setSel('card');setPm('me');setOpen(null);if(scr!=='login')setScr('home')}}>{p.n}{p.org?' (organiser)':''}</button>)}</div>
     <label className="l">Simulate</label>
     {[['Others submit their orders',othersDone],['Deadline passes',()=>{setG(x=>({...x,deadlineAt:Date.now()}));setSheet(null)}],
      [g.sold.length?'Milo is unavailable (tap to restore)':'Milo becomes unavailable',()=>{setG(x=>({...x,sold:x.sold.length?[]:[8]}));note(g.sold.length?'Milo is available again at '+outlet.n:'Milo is now unavailable at '+outlet.n,'alert');setSheet(null)}],

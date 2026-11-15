@@ -437,3 +437,16 @@ test('deadline expiration does not open the organiser popup on the logged-out sc
  const a=timedGroup();a.click('More');a.find(n=>n.props.className==='card row click'&&a.label(n)==='Log out').props.onClick();a.text();
  a.advanceTo(a.g().deadlineAt);assert(a.g().closed);assert.equal(a.state[8],null);assert(a.text().includes('Log in'));
 });
+
+test('joining disclosure appears before acceptance and marketing stays optional and unticked',()=>{
+ const a=basicGroup();a.aria('Invite Ben');switchUser(a,'Ben');visitInvite(a);
+ assert(a.text().includes('Before you join'));assert(a.text().includes('card-specific messages stay private'));
+ const check=a.find(n=>n.type==='input'&&n.props.type==='checkbox');assert.equal(check.props.checked,false);a.click('Join group');assert.equal(a.state[6][1].marketingOptIn,false);assert(a.state[6][1].marketingUpdatedAt>0);
+});
+test('marketing opt-in is explicit, isolated by account and can be withdrawn',()=>{
+ const a=basicGroup();a.aria('Invite Ben');a.aria('Invite Calvin');switchUser(a,'Ben');visitInvite(a);
+ a.find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:true}});a.click('Join group');assert(a.state[6][1].marketingOptIn);
+ switchUser(a,'Calvin');visitInvite(a);assert.equal(a.find(n=>n.type==='input'&&n.props.type==='checkbox').props.checked,false);assert.equal(a.state[6][2].marketingOptIn,false);
+ switchUser(a,'Ben');a.click('More');a.find(n=>n.props.className==='card row click'&&a.label(n)==='Privacy and data').props.onClick();assert(a.find(n=>n.type==='input'&&n.props.type==='checkbox').props.checked);
+ a.find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:false}});assert.equal(a.state[6][1].marketingOptIn,false);
+});
