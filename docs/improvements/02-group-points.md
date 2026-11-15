@@ -40,7 +40,7 @@ The production build passed.
 ## Manual review
 
 1. Start a new group with individual payments and add Ben.
-2. Submit one default $5.20 Kaya Toast Set as Alex. Confirm an estimate of 45 points and a 1.1× multiplier.
+2. Submit one default $5.20 Kaya Toast Set as Mary Ng. Confirm an estimate of 45 points and a 1.1× multiplier.
 3. Add Calvin, then Dylan. Check that the estimate changes to 49 points at 1.2×, then 54 points at 1.3×.
 4. Close ordering, send the order, advance its outlet status and mark it collected.
-5. Confirm Alex receives 54 points. Open history details and confirm the 1.3× multiplier and 54 earned points.
+5. Confirm Mary Ng receives 54 points. Open history details and confirm the 1.3× multiplier and 54 earned points.

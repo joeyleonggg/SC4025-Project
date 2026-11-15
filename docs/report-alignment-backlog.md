@@ -40,13 +40,15 @@ Apply the same 2–10 expected-size bounds in creation and pickup editing. Expec
 
 ### A02 Mary organiser identity
 
-**Status** Pending.
+**Status** Complete. Delivery commit titled `Align organiser demo identity with Mary Ng`.
 
 **Requirement** Section 3.3 persona, Section 4.2 and assigned presentation alignment.
 
 Rename the organiser consistently across the account, user switcher, notifications, saved groups, sample history and demo instructions. Document the actual generated demo email. Preserve stable user IDs and existing role behaviour.
 
 **Acceptance checks** Mary can log in, create a group, invite participants, collect an order and view correctly named history. The documented credentials work. Participants retain their own accounts and permissions.
+
+**Demo credentials** Organiser `maryng@yakun.demo`, password `kaya1234`. The displayed name is Mary Ng. Participant Ben uses `ben@yakun.demo` with the same password. The organiser retains user ID 0 and card ending 1111.
 
 ### A03 Individual payment scope
 
@@ -211,4 +213,4 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 
 For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-The next implementation item is A02, the Mary organiser identity. Unresolved policy details remain recorded above for discussion.
+The next implementation item is A03, individual payment scope. Unresolved policy details remain recorded above for discussion.

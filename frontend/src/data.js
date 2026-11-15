@@ -200,7 +200,7 @@ export const REWARDS = [
  {id:'r3',t:'$5 off',cost:500,min:10,val:5}];
 // pmeth = payment method the person selected (nothing is charged yet). paid/paidAmt/paidMeth are only set when the organiser sends the order.
 const U = (id,n,pts,org) => ({id,n,pts,org,in:org?1:0,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:null,rw:null,earned:0,left:0,hist:[]});
-export const USERS0 = [U(0,'Alex',340,1),U(1,'Ben',260),U(2,'Calvin',90),U(3,'Dylan',520),U(4,'Eve',150),
+export const USERS0 = [U(0,'Mary Ng',340,1),U(1,'Ben',260),U(2,'Calvin',90),U(3,'Dylan',520),U(4,'Eve',150),
  U(5,'Farah',410),U(6,'Gareth',75),U(7,'Hui Min',230),U(8,'Irfan',600),U(9,'Jia Wei',180)];
 // Demo "card on file" per person, purely cosmetic for the prototype.
 export const CARD_LAST4 = {0:'1111',1:'2222',2:'3333',3:'4444',4:'5555',5:'6666',6:'7777',7:'8888',8:'9999',9:'1212'};
@@ -220,9 +220,9 @@ export const DEMO_ORDERS = {
  9:[demoItem(1,'Hot Coffee O (Regular), kosong')]
 };
 export const SAVED0 = [
- {name:'Marketing Team',members:['Alex','Ben','Calvin','Dylan']},
- {name:'Friday Breakfast Crew',members:['Alex','Ben','Dylan','Eve']},
- {name:'Project Team',members:['Alex','Calvin','Eve']}];
+ {name:'Marketing Team',members:['Mary Ng','Ben','Calvin','Dylan']},
+ {name:'Friday Breakfast Crew',members:['Mary Ng','Ben','Dylan','Eve']},
+ {name:'Project Team',members:['Mary Ng','Calvin','Eve']}];
 // Previous group orders. Each entry keeps the date/time, outlet, pickup slot and EVERY submitted member's own items,
 // so each person sees "what I ordered" and the organiser sees "who got what".
 const ho = (items, rw='') => { const owed = items.reduce((s,i)=>s+i.p*i.q,0); return {items, owed, rw, earn: Math.floor(owed*10)}; };
@@ -238,5 +238,5 @@ const O2 = {
  2: ho([it(3,'Peanut Butter Toast Set','Teh O, kosong',1,5.2)]),
  3: ho([it(1,'Kaya Toast Set','Kopi',2,5.2)])};
 export const HIST0 = [
- {id:'YT0987',name:'Friday Breakfast Crew',at:new Date(2026,8,18,8,20).getTime(),outlet:'Ya Kun – Far East Square',slot:'8:45 AM',coll:'C-017',status:'collected',pay:'individual',members:['Alex','Ben','Dylan'],orders:O1,total:tot(O1)},
- {id:'YT0951',name:'Marketing Team',at:new Date(2026,8,8,8,35).getTime(),outlet:'Ya Kun – NTU North Spine',slot:'9:00 AM',coll:'C-029',status:'collected',pay:'individual',members:['Alex','Ben','Calvin','Dylan'],orders:O2,total:tot(O2)}];
+ {id:'YT0987',name:'Friday Breakfast Crew',at:new Date(2026,8,18,8,20).getTime(),outlet:'Ya Kun – Far East Square',slot:'8:45 AM',coll:'C-017',status:'collected',pay:'individual',members:['Mary Ng','Ben','Dylan'],orders:O1,total:tot(O1)},
+ {id:'YT0951',name:'Marketing Team',at:new Date(2026,8,8,8,35).getTime(),outlet:'Ya Kun – NTU North Spine',slot:'9:00 AM',coll:'C-029',status:'collected',pay:'individual',members:['Mary Ng','Ben','Calvin','Dylan'],orders:O2,total:tot(O2)}];

@@ -38,7 +38,7 @@ Capacities and operating availability are demo data. Later slots use a mock capa
 
 ## Manual acceptance
 
-1. Refresh the preview and sign in as `alex@yakun.demo` with password `kaya1234`.
+1. Refresh the preview and sign in as `maryng@yakun.demo` with password `kaya1234`.
 2. Start a group and continue to **Choose pickup**.
 3. Confirm there are four quick buttons, beginning with ASAP, followed by **Choose a later time**.
 4. Open the dropdown. Confirm its earliest choice is after the final quick time and later options are 30 minutes apart.

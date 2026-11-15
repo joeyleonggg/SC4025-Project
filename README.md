@@ -29,3 +29,11 @@ npm run dev
 The terminal prints a link such as `http://localhost:XXXX`. Open it in your browser, the app is shown inside a phone frame.
 
 To stop the app, press `Ctrl + C` in the terminal.
+
+## Demo accounts and controls
+
+Sign in as `maryng@yakun.demo` with password `kaya1234` to use the organiser account. The participant account `ben@yakun.demo` uses the same password.
+
+After signing in, select the name at the top right to switch demo users or simulate deadlines, stock changes, full pickup slots, declined payments and outlet status updates.
+
+Orders, card charges and account balances are simulated in the browser. Refreshing resets the demo.
