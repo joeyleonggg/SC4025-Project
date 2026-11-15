@@ -36,7 +36,7 @@ Apply the same 2–10 expected-size bounds in creation and pickup editing. Expec
 
 **Acceptance checks** With only the organiser present, pickup editing stops at 2. With four members present, it stops at 4. Increasing stops at 10. Changing expected size removes no participants. Focused checks and the production build have already passed.
 
-**Manual review** Create a group and open Change pickup time or group size. Reduce the expected size to 2 and confirm the minus button disables. Increase it to 10 and confirm the plus button disables. Add three participants, reopen the same controls and confirm the expected size cannot fall below 4.
+**Manual review** Create a group and open Change pickup time or group size. Reduce the expected size to 2 and confirm the minus button disables. Increase it to 10 and confirm the plus button disables. Invite three participants and join as each of them, then reopen the same controls and confirm the expected size cannot fall below 4.
 
 ### A02 Mary organiser identity
 
@@ -142,7 +142,9 @@ Limit personal payment status and failure messages to the relevant participant a
 
 ### A10 Invitation access and joining flow
 
-**Status** Pending.
+**Status** Complete. Delivery commit: `Add named invitations and participant joining`.
+
+**Verification** Production build and all thirty automated checks passed, including thirteen invitation cases for intended accounts, saved-group scope, capacity, lifecycle states, removal/re-invitation, stale links, clipboard outcomes and sign-in routing. Browser walkthrough confirmed Mary inviting Ben and Ben joining.
 
 **Requirement** FR-01, FR-10, FR-11 and US-02/US-12.
 
@@ -150,7 +152,7 @@ Replace the placeholder invitation experience with a working mock flow appropria
 
 **Acceptance checks** An invited, logged-in participant can join the intended active group. A non-invited account is blocked. Full, expired, cancelled and sent invitations explain the problem. Reusing a saved group does not grant access to unrelated people. Clipboard success is reported accurately.
 
-**Decision to record** Agree on the presentation's mock invitation interaction. Cross-device sharing would require shared state beyond the current in-memory application and should be treated as a separate scope decision.
+**Confirmed presentation interaction** Yi Xiang selected named invitations and participant joining on 16 November 2026. Mary invites the account; the presenter switches to that participant and accepts. Saved groups create pending invitations. Links use the current app address and work in the same running tab; fresh tabs, refreshes and other devices have no shared group data and explain that limitation. Cross-device sharing remains separate scope.
 
 ### A11 Automatic payment reminders
 
@@ -221,10 +223,10 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 3. The advance-order extension exception needs an explicit statement alongside the two-hour qualification rule.
 4. Extension boundary resolved: one full 15-minute extension per group; no shortening and no extension reaching or passing collection.
 5. Retention duration and leaving-group deletion scope need a policy compatible with history and saved groups.
-6. Confirm the demo invitation interaction at A10. A07 documents single rounding after the full bonus calculation as the MVP points convention for group discussion.
+6. Invitation interaction confirmed at A10: named invitations followed by participant joining in the same demo tab. A07 documents single rounding after the full bonus calculation as the MVP points convention for group discussion.
 
 ## Delivery routine
 
 For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-The next implementation item is A10, invitation access and joining flow. Unresolved policy details remain recorded above for discussion.
+The next implementation item is A11, automatic payment reminders. Unresolved policy details remain recorded above for discussion.

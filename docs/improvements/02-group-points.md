@@ -30,8 +30,8 @@ New history records store the rate and award. Previous recorded awards and legac
 ## Manual review
 
 1. Sign in as `maryng@yakun.demo`, password `kaya1234`, and create a group.
-2. Add Ben and submit one default Set A for $6.30 as Mary. Confirm the estimate is 50 points.
-3. Add Calvin and Dylan. Confirm Mary's estimate remains 50 points.
+2. Invite Ben, join as Ben, then switch back to Mary and submit one default Set A for $6.30 as Mary. Confirm the estimate is 50 points.
+3. Invite Calvin and Dylan and join as each of them, then switch back to Mary. Confirm Mary's estimate remains 50 points.
 4. Confirm each person's payment method, close ordering and send. Earned points should not be credited yet.
 5. Advance the outlet status and mark the order collected. Mary should receive 50 points.
 6. Open the history details. Confirm the award is 50 points and the rate is 8 points per $1, with no new group multiplier.

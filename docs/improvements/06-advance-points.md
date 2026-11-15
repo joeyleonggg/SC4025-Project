@@ -56,7 +56,7 @@ npm run build
 1. Sign in as `maryng@yakun.demo`, password `kaya1234`.
 2. Create a **Pickup** group and add a default Set A for $6.30. Confirm the estimate is 50 points.
 3. For an **Advance order** group with a qualifying time, add the same set. Confirm 55 points and the 10% bonus terms appear in the cart and payment screen.
-4. Add more members. Confirm the personal estimate stays 55.
+4. Invite more participants and join as each of them. Confirm the personal estimate stays 55.
 5. Apply the $2 reward as Mary. Confirm her payable total is $4.30 and her estimate is 37 points; Ben's undiscounted $6.30 still earns 55.
 6. Send, advance the mock outlet to ready, and mark collected. Confirm points were credited only at collection.
 7. Open history and confirm the 10% bonus and personal award. Starting another group must not change the previous record.

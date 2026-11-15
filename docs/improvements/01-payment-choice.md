@@ -23,7 +23,7 @@ A production build passed. Targeted checks of the actual React interaction handl
 
 1. Refresh and sign in as `maryng@yakun.demo`, password `kaya1234`.
 2. Create a group with a pickup time late enough for the ordering window. On **Ordering time and payment**, confirm the individual-payment explanation appears and there is no **I will pay for everyone** choice.
-3. Add Ben and Calvin through **View group** and the demo controls.
+3. Invite Ben and Calvin through **View group**, then switch to each account and choose **Join group**.
 4. Submit one default Set A at $6.30 as each of Mary, Ben and Calvin. Confirm each person's own saved card; no charge should appear yet.
 5. As Mary, close ordering and send the group order. The group total is $18.90, but each person's **Pay** screen should show a $6.30 payment on their own card (1111, 2222 and 3333 respectively).
 6. Mark the order collected and open each person's order history. Confirm **Everyone paid for their own order** and **You paid $6.30**.

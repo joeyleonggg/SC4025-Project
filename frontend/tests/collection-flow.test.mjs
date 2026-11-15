@@ -10,20 +10,22 @@ const require=createRequire(import.meta.url);
 const source=transformSync(readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8'),{loader:'jsx',format:'cjs',jsx:'automatic'}).code;
 const minute=60000;
 // Run the real App handlers with controlled time/state, without browser timers.
-function app(at='2026-11-16T09:01:00+08:00'){
+function app(at='2026-11-16T09:01:00+08:00',options={}){
  let now=Date.parse(at),cursor=0;
- const state=[];
+ const state=[],copiedLinks=[],events={},effects=[];let mounted=false;
+ const browserWindow={location:{origin:'http://localhost:5173',pathname:'/',hash:options.hash||''},addEventListener:(name,fn)=>{events[name]=fn;},removeEventListener:name=>{delete events[name];}};
+ const navigator=options.clipboard==='missing'?{}:{clipboard:{writeText:async text=>{if(options.clipboard==='reject')throw new Error('Denied');copiedLinks.push(text);}}};
  class TestDate extends Date{
   constructor(...args){super(...(args.length?args:[now]));}
   static now(){return now;}
  }
  const hooks={
   useState(initial){const i=cursor++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return [state[i],value=>{state[i]=typeof value==='function'?value(state[i]):value;}];},
-  useRef(value){const i=cursor++;return state[i]??={current:value};},useEffect(){}
+  useRef(value){const i=cursor++;return state[i]??={current:value};},useEffect(effect,deps){if(!mounted&&deps?.length===0)effects.push(effect);}
  };
  const module={exports:{}};
- vm.runInNewContext(source,{module,Date:TestDate,setTimeout(){},clearTimeout(){},require:name=>name==='react'?hooks:name==='./data'?data:name==='./styles.css'?{}:require(name)});
- const render=()=>{cursor=0;return module.exports.default();};
+ vm.runInNewContext(source,{module,Date:TestDate,window:browserWindow,navigator,URLSearchParams,setTimeout(){},clearTimeout(){},require:name=>name==='react'?hooks:name==='./data'?data:name==='./styles.css'?{}:require(name)});
+ const render=()=>{cursor=0;const tree=module.exports.default();if(!mounted){mounted=true;for(const effect of effects)effect();}return tree;};
  function* walk(node){
   if(Array.isArray(node)){for(const child of node)yield*walk(child);}
   else if(node?.props){yield node;yield*walk(node.type?.name==='PickupChoices'?node.type(node.props):node.props.children);}
@@ -45,7 +47,7 @@ function app(at='2026-11-16T09:01:00+08:00'){
  };
  const create=()=>{click('Next: ordering time');click('Create group');assert(g().live);click('View group');};
  const submit=()=>{click('Menu');aria('Add '+data.MENU.find(m=>m.id===1).name);click('Add to order · $6.30');click('View my order · $6.30');click('Submit my order');click('Confirm payment method');click('Status');click('Close ordering early');click('Close ordering');};
- return {state,g,find,button,click,aria,select,option,text,label,choose,start,create,submit,now:()=>now,at:value=>{now=value;}};
+ return {state,g,copiedLinks,events,browserWindow,find,button,click,aria,select,option,text,label,choose,start,create,submit,now:()=>now,at:value=>{now=value;}};
 }
 
 test('pickup retains quick choices, includes preparation time and rejects stale creation',()=>{
@@ -157,9 +159,9 @@ test('bonus rounds down once on actual personal spend, including cents and zero'
 
 test('advance cart and checkout show bonus terms; personal discount and membership are isolated',()=>{
  const a=app();a.start();a.click('Advance order');a.choose(5);a.create();const initial=a.state[6][0].pts;
- a.aria('Add Ben');a.click('Menu');a.aria('Add '+data.MENU.find(m=>m.id===1).name);a.click('Add to order · $6.30');a.click('View my order · $6.30');
+ joinMember(a,'Ben');a.click('Menu');a.aria('Add '+data.MENU.find(m=>m.id===1).name);a.click('Add to order · $6.30');a.click('View my order · $6.30');
  assert(a.text().includes('55 Cherish points'));assert(a.text().includes('Advance bonus eligible: 10% extra points'));
- a.click('Group');a.aria('Add Calvin');a.aria('Add Dylan');a.click('My order1');assert(a.text().includes('55 Cherish points'));
+ a.click('Group');joinMember(a,'Calvin');joinMember(a,'Dylan');a.click('My order1');assert(a.text().includes('55 Cherish points'));
  a.click('View eligible rewards');a.find(n=>n.props.className?.startsWith('opt ')&&n.props.onClick&&JSON.stringify(n.props.children).includes('$2 off')).props.onClick();
  assert(a.text().includes('37 Cherish points'));a.click('Submit my order');assert(a.text().includes('37 Cherish points'));assert(a.text().includes('10% advance-order bonus'));a.click('Confirm payment method');
  // Ben's undiscounted personal order still gets the full 55-point estimate.
@@ -184,7 +186,7 @@ const cardButton=(a,id,method)=>a.find(n=>n.type==='button'&&n.props.className?.
 const switchUser=(a,name)=>{a.aria('Switch demo user');a.click(name);};
 
 test('Ben recovers with his alternative card; failure charges nobody and retry charges each person once',()=>{
- const a=app();a.start();a.choose(5);a.create();a.aria('Add Ben');a.aria('Add Calvin');const initial=a.state[6].map(p=>p.pts);
+ const a=app();a.start();a.choose(5);a.create();joinMember(a,'Ben');joinMember(a,'Calvin');const initial=a.state[6].map(p=>p.pts);
  personalOrder(a);switchUser(a,'Ben');a.click('Order');personalOrder(a,2);switchUser(a,'Calvin');a.click('Order');personalOrder(a);
  switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Status');a.click('Close ordering early');a.click('Close ordering');
  a.state[7]={...a.g(),failFor:[1]};const originalSend=a.button('Send group order to outlet');a.click('Send group order to outlet');
@@ -219,7 +221,7 @@ const noOtherCards=(a,owner)=>{
  for(const user of [0,1,2])if(user!==owner)for(const card of data.SAVED_CARDS[user])assert(!a.text().includes('Card ending '+card.last4),'Leaked card '+card.last4+' to '+owner);
 };
 function paymentTrio(){
- const a=app();a.start();a.choose(5);a.create();a.aria('Add Ben');a.aria('Add Calvin');personalOrder(a);
+ const a=app();a.start();a.choose(5);a.create();joinMember(a,'Ben');joinMember(a,'Calvin');personalOrder(a);
  switchUser(a,'Ben');a.click('Order');personalOrder(a);switchUser(a,'Calvin');a.click('Order');personalOrder(a);
  switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Status');return a;
 }
@@ -265,4 +267,70 @@ test('demo payment controls expose only the current participant and clear previo
  const controls=a.find(n=>n.props.className==='chips'&&a.label(n)==='Calvin');assert.equal(a.label(controls),'Calvin');
  switchUser(a,'Mary Ng (organiser)');a.aria('Switch demo user');assert(a.text().includes('Others submit their orders'));
  const all=a.find(n=>n.props.className==='chips'&&a.label(n)==='Mary Ng (organiser)BenCalvin');assert(a.label(all).includes('Ben'));
+});
+
+function joinMember(a,name){
+ const screen=a.state[0];a.state[0]='group';a.aria('Invite '+name);
+ switchUser(a,name);a.click('Order');a.click('View invitation');a.click('Join group');
+ switchUser(a,'Mary Ng (organiser)');a.state[0]=screen;
+}
+
+const visitInvite=(a,key=a.g().inviteKey)=>{a.browserWindow.location.hash='#invite='+encodeURIComponent(key);a.events.hashchange();};
+const basicGroup=()=>{const a=app();a.start();a.choose(5);a.create();return a;};
+
+test('named invitations require the intended account to join, while outsiders cannot join',()=>{
+ const a=basicGroup();a.aria('Invite Ben');assert(a.g().invitedIds.includes(1));assert.equal(a.state[6][1].in,0);assert.equal(a.state[6].filter(p=>p.in).length,1);
+ switchUser(a,'Calvin');visitInvite(a);assert(a.text().includes('This account has not been invited'));assert(a.button('Join group').props.disabled);a.button('Join group').props.onClick();assert.equal(a.state[6][2].in,0);assert(!a.text().includes(a.g().name));assert(!a.text().includes('Ordering closes at'));assert(!a.text().includes(a.g().slot));
+ switchUser(a,'Ben');visitInvite(a);assert(a.text().includes('Mary Ng invited you to'));a.click('Join group');assert.equal(a.state[6][1].in,1);
+ visitInvite(a);assert(a.text().includes('already joined'));a.button('Join group').props.onClick();assert.equal(a.state[6].filter(p=>p.in).length,2);
+});
+
+test('saved groups invite only their own members without auto-joining anyone',()=>{
+ const a=app();a.start();a.aria('Back');a.click('Project Team');a.click('Next: choose pickup');a.choose(5);a.create();
+ assert.deepEqual(Array.from(a.g().invitedIds),[2,4]);assert.equal(a.state[6].filter(p=>p.in).length,1);
+ switchUser(a,'Ben');visitInvite(a);assert(a.text().includes('has not been invited'));assert(a.button('Join group').props.disabled);
+ switchUser(a,'Calvin');visitInvite(a);a.click('Join group');assert.equal(a.state[6][2].in,1);assert.equal(a.state[6][4].in,0);
+});
+
+test('leaving permits rejoining, but removal revokes access until a new invitation',()=>{
+ const a=basicGroup();joinMember(a,'Ben');switchUser(a,'Ben');a.click('Order');a.click('Group');a.click('Leave group');a.find(n=>n.type==='button'&&n.props.className==='btn'&&n.props.children==='Leave group').props.onClick();
+ assert.equal(a.state[6][1].in,0);assert(a.g().invitedIds.includes(1));visitInvite(a);a.click('Join group');assert.equal(a.state[6][1].in,1);
+ switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Group');a.click('Remove');a.find(n=>n.type==='button'&&n.props.className==='btn'&&n.props.children==='Remove').props.onClick();
+ assert(!a.g().invitedIds.includes(1));switchUser(a,'Ben');visitInvite(a);assert(a.text().includes('You were removed'));a.button('Join group').props.onClick();assert.equal(a.state[6][1].in,0);
+ switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Group');a.aria('Invite Ben');switchUser(a,'Ben');visitInvite(a);a.click('Join group');assert.equal(a.state[6][1].in,1);
+});
+
+test('full invitations require space and join rechecks capacity even from an earlier screen',()=>{
+ const a=basicGroup();a.aria('Invite Ben');switchUser(a,'Ben');visitInvite(a);const join=a.button('Join group');
+ switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Group');joinMember(a,'Calvin');a.state[7]={...a.g(),size:2};a.text();join.props.onClick();assert.equal(a.state[6][1].in,0);
+ switchUser(a,'Ben');visitInvite(a);assert(a.text().includes('This group is full'));assert(a.button('Join group').props.disabled);
+ switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Group');a.click('Change pickup time or group size');a.aria('More people');a.click('Done');switchUser(a,'Ben');visitInvite(a);a.click('Join group');assert.equal(a.state[6][1].in,1);
+});
+
+for(const [name,patch,message]of [
+ ['cancelled',{cancelled:true},'This group was cancelled'],['sent',{sent:true},'already been sent'],['expired',{inv:'expired'},'invitation has expired'],['closed',{closed:true},'Ordering has closed']
+])test(name+' invitations explain the problem and reject joining',()=>{
+ const a=basicGroup();a.aria('Invite Ben');switchUser(a,'Ben');visitInvite(a);const join=a.button('Join group');a.state[7]={...a.g(),...patch};a.text();join.props.onClick();assert.equal(a.state[6][1].in,0);assert(a.text().includes(message));assert(a.button('Join group').props.disabled);
+});
+
+test('deadline expiry and a previous group link cannot admit a participant',()=>{
+ const a=basicGroup();a.aria('Invite Ben');const oldKey=a.g().inviteKey;switchUser(a,'Ben');visitInvite(a);a.at(a.g().deadlineAt);assert(a.text().includes('Ordering has closed'));a.button('Join group').props.onClick();assert.equal(a.state[6][1].in,0);
+ switchUser(a,'Mary Ng (organiser)');a.state[7]={...a.g(),cancelled:true};a.click('Home');a.click('Start Ya Kun Together');a.click('Next: choose pickup');a.choose(5);a.create();a.aria('Invite Ben');assert.notEqual(a.g().inviteKey,oldKey);
+ switchUser(a,'Ben');visitInvite(a,oldKey);assert(a.text().includes('different or previous group'));assert(a.button('Join group').props.disabled);visitInvite(a);a.click('Join group');assert.equal(a.state[6][1].in,1);
+});
+
+for(const clipboard of ['success','reject','missing'])test('clipboard '+clipboard+' reports the actual result and offers a local invitation link',async()=>{
+ const a=app(undefined,{clipboard});a.start();a.choose(5);a.create();await a.button('Copy link').props.onClick();
+ const link=a.find(n=>n.type==='input'&&n.props.id==='invitation-link');assert(link.props.readOnly);assert(link.props.value.startsWith('http://localhost:5173/#invite='));assert(link.props.value.includes(a.g().inviteKey));
+ if(clipboard==='success'){assert.equal(a.copiedLinks[0],link.props.value);assert(a.text().includes('Invitation link copied'));}
+ else{assert.equal(a.copiedLinks.length,0);assert(!a.text().includes('Invitation link copied'));assert(a.text().includes('copy the link manually'));}
+});
+
+test('an invitation survives sign-in and a fresh tab explains missing mock state',()=>{
+ const a=basicGroup();a.aria('Invite Ben');visitInvite(a);a.click('More');a.find(n=>n.props.className==='card row click'&&a.label(n)==='Log out').props.onClick();
+ for(const [placeholder,value]of [['you@example.com','ben@yakun.demo'],['Password','kaya1234']])a.find(n=>n.props.placeholder===placeholder).props.onChange({target:{value}});
+ a.click('Log in');assert(a.text().includes('Mary Ng invited you'));a.click('Join group');assert.equal(a.state[6][1].in,1);
+ const fresh=app(undefined,{hash:'#invite='+a.g().inviteKey});
+ for(const [placeholder,value]of [['you@example.com','ben@yakun.demo'],['Password','kaya1234']])fresh.find(n=>n.props.placeholder===placeholder).props.onChange({target:{value}});
+ fresh.click('Log in');assert(fresh.text().includes('not available in this demo tab'));assert(fresh.button('Join group').props.disabled);
 });

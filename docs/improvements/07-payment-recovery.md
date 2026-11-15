@@ -48,7 +48,7 @@ npm run build
 
 ## Manual acceptance
 
-1. Sign in as `maryng@yakun.demo`, password `kaya1234`. Create a group with a suitable collection time and add Ben and Calvin.
+1. Sign in as `maryng@yakun.demo`, password `kaya1234`. Create a group with a suitable collection time and invite Ben and Calvin. Switch to each person, open their invitation and choose **Join group**.
 2. As each person, submit a default Set A and confirm their default saved card. Confirm there are two card choices and no charge yet.
 3. Switch back to Mary. In the top-right **Demo controls**, under **Decline payment when the order is sent**, select Ben. Dismiss the controls, close ordering and send.
 4. Confirm the order was not sent. Open Pay as each person and confirm no latest charge was created.

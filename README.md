@@ -95,3 +95,13 @@ Mary can see each participant's payment readiness or decline, without their card
 Switching demo accounts clears temporary payment messages and receipts. Payment simulation controls show participants only their own account; Mary can simulate the group members' payments.
 
 See [the visibility rules and manual test steps](docs/improvements/08-payment-privacy.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.
+
+## Invitations and joining
+
+Mary invites named accounts through **Group → Invite people**. Switch to the invited participant, open the invitation from Home or **Order → View invitation**, then select **Join group**. Inviting someone does not join them automatically. Saved groups invite only their listed members.
+
+Non-invited accounts cannot join. Removed members need a fresh invitation; people who leave can rejoin while ordering is open and there is room. Full, expired, closed, cancelled and sent invitations explain the problem.
+
+Links point to this app and open the invitation in the same running demo tab. New tabs, refreshes and other devices have no shared order state. Clipboard failures offer the link for manual copying instead of reporting success.
+
+See [the invitation flow and test steps](docs/improvements/09-invitations.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.

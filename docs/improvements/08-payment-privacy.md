@@ -44,7 +44,7 @@ npm run build
 
 ## Manual acceptance
 
-1. Sign in as `maryng@yakun.demo`, password `kaya1234`. Create a group, add Ben and Calvin, and submit and confirm each person's own card.
+1. Sign in as `maryng@yakun.demo`, password `kaya1234`. Create a group and invite Ben and Calvin. Switch to each participant and choose **Join group**, then submit and confirm each person's own card.
 2. As Mary, simulate Ben's decline under the top-right demo controls. Close ordering and send.
 3. Mary should see that Ben's payment declined, with no Ben card details in Status or notifications.
 4. Switch immediately to Calvin. Check Home, Status, My order, Pay and notifications: there should be no named Ben failure, Ben card number or leftover decline popup. Calvin's own cards and status may appear.

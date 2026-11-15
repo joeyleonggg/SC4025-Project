@@ -92,7 +92,9 @@ const slotSet = (win=10) => {
  ms[0]=Math.ceil((now+win*60000)/300000)*300000+15*60000;
  return {slotMs:ms,slotTimes:ms.map(slotLabel)};
 };
-const freshG = (n=0) => ({...G0, gid:'YT'+(1024+n), coll:'C-'+String(42+n).padStart(3,'0'), ...slotSet()});
+let invitationSequence=0;
+const readInviteKey=()=>typeof window==='undefined'?'':new URLSearchParams(window.location.hash.slice(1)).get('invite')||'';
+const freshG = (n=0) => ({...G0,invitedIds:[],removedIds:[],inviteKey:'YT'+(1024+n)+'-'+Date.now().toString(36)+'-'+(++invitationSequence), gid:'YT'+(1024+n), coll:'C-'+String(42+n).padStart(3,'0'), ...slotSet()});
 
 function App(){
  const [scr,setScr]=useState('login');
@@ -118,7 +120,8 @@ function App(){
  const [receipt,setReceipt]=useState(null);
  const [step,setStep]=useState(1);
  const [banners,setBanners]=useState([]);
- const nid=useRef(0), toastT=useRef(null), Pr=useRef(null);
+ const [inviteRequest,setInviteRequest]=useState(readInviteKey);
+ const nid=useRef(0), toastT=useRef(null), Pr=useRef(null),Gr=useRef(null);
  const collectedGroup=useRef(null),sentGroup=useRef(null);
 
  const isOrg=uid===0, draft=P[uid], me=submitted(draft), org=P[0];
@@ -136,7 +139,7 @@ function App(){
   const reference=planned?Math.max(now,g.live?g.deadlineAt:now+g.win*60000):now;
   return slotFits(t)&&(advanceExtensionApplies(t,now)||timeOfSlot(t)>=reference+leadMinutes*60000);
  };
- Pr.current=P;
+ Pr.current=P;Gr.current=g;
  const members=P.filter(p=>p.in).map(submitted), subm=members.filter(p=>p.sub);
  const bonusEligible=now=>!g.cancelled&&g.collectionMode==='advance'&&g.advanceQualified&&g.advanceSlotAt===slotAt&&
   slotAt>=g.advanceDeadlineAt+120*60000&&(slotAt>=now+120*60000||advanceExtensionApplies(g.slot,now));
@@ -190,7 +193,28 @@ function App(){
   <span>Points rate</span><b>8 points per $1 paid{bonusPercent===10&&' + 10% advance bonus'}</b>
  </div>;
  const statusText=g.cancelled?'Cancelled':g.sent?(g.status==='collected'?'Collected':g.status==='ready'?'Ready for collection':'Being prepared'):g.closed?'Ordering closed':'Ordering open';
- const invState=g.sent||g.cancelled||g.inv==='expired'?'expired':(g.inv==='full'||members.length>=g.size)?'full':'valid';
+ const hasInvite=isOrg||g.invitedIds.includes(uid);
+ const invitationStatus=(now=Date.now(),id=uid,group=g,people=P)=>{
+  if(!group.live)return 'unavailable';
+  if(inviteRequest&&inviteRequest!==group.inviteKey)return 'invalid';
+  if(id!==0&&!group.invitedIds.includes(id))return group.removedIds.includes(id)?'removed':'not-invited';
+  if(group.cancelled)return 'cancelled';
+  if(group.sent)return 'sent';
+  if(people[id].in)return 'joined';
+  if(group.inv==='expired')return 'expired';
+  if(group.closed||now>=group.deadlineAt)return 'closed';
+  if(group.inv==='full'||people.filter(p=>p.in).length>=group.size)return 'full';
+  return 'valid';
+ };
+ const invState=invitationStatus();
+ const invitationMessages={unavailable:'This group is not available in this demo tab. Use the tab where it was created; a new tab or refresh has no shared order data.',invalid:'This invitation belongs to a different or previous group. Ask the organiser for the current invitation.', 'not-invited':'This account has not been invited. Ask the organiser for an invitation to your account.',removed:'You were removed from this group. The organiser must invite you again before you can rejoin.',cancelled:'This group was cancelled. Its invitation can no longer be used.',sent:'This group order has already been sent. New members cannot join.',expired:'This invitation has expired. Ask the organiser to restore invitations or start a new group.',closed:'Ordering has closed. Ask the organiser whether an extension is available.',full:'This group is full. Ask the organiser to increase the group size or free a place.',joined:'You have already joined this group.'};
+ const inviteUrl=(typeof window==='undefined'?'http://localhost:5173/':window.location.origin+window.location.pathname)+'#invite='+encodeURIComponent(g.inviteKey);
+ const openInvite=()=>{setInviteRequest(g.inviteKey);setScr('join')};
+ useEffect(()=>{
+  if(typeof window==='undefined')return;
+  const open=()=>{setInviteRequest(readInviteKey());setScr(current=>current==='login'?'login':'join')};
+  window.addEventListener('hashchange',open);return()=>window.removeEventListener('hashchange',open);
+ },[]);
  const GATED=['group','cart','track','done','pay','paid'];
  const screen=!me.in&&GATED.includes(scr)?'gate':scr;
  const TAB={gate:'order',join:'order',home:'home',create:'home',menu:'order',cart:'order',group:'order',track:'order',done:'order',wallet:'pay',pay:'pay',paid:'pay',rewards:'rewards',more:'more',repeat:'more',notifs:'more'};
@@ -217,7 +241,7 @@ function App(){
  const login=()=>{
   const acc=ACCOUNTS.find(a=>a.identifier.toLowerCase()===idf.trim().toLowerCase());
   if(!acc||acc.password!==pwd){setLoginErr('Incorrect email or password.');return}
-  setLoginErr('');setUid(acc.id);setScr('home');
+  setLoginErr('');setUid(acc.id);setScr(inviteRequest?'join':'home');
  };
  // note(text, icon, to): `to` = the user ids who receive it (default: everyone currently in the group).
  const note=(t,i='bell',to)=>{
@@ -269,9 +293,9 @@ function App(){
    setG(x=>({...x,...slotSet(x.win),slot:'',advanceQualified:false}));setStep(2);return say('Choose a later pickup time');
   }
   if(at>=slotAt)return say('Choose a shorter ordering time or a later pickup');
-  setG(x=>({...x,pay:'individual',live:true,advanceQualified:x.collectionMode==='advance',advanceQualifiedAt:x.collectionMode==='advance'?now:0,advanceDeadlineAt:x.collectionMode==='advance'?at:0,advanceSlotAt:x.collectionMode==='advance'?slotAt:0,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
-  const inv=P.filter(x=>!x.org&&preset.includes(x.n)).slice(0,g.size-1).map(x=>x.id); // only the saved group's members; a new team starts with just the organiser
-  setP(p=>p.map(x=>inv.includes(x.id)?{...x,in:1}:x));
+  const inv=P.filter(x=>!x.org&&preset.includes(x.n)).slice(0,g.size-1).map(x=>x.id);
+  setG(x=>({...x,pay:'individual',live:true,invitedIds:inv,removedIds:[],advanceQualified:x.collectionMode==='advance',advanceQualifiedAt:x.collectionMode==='advance'?now:0,advanceDeadlineAt:x.collectionMode==='advance'?at:0,advanceSlotAt:x.collectionMode==='advance'?slotAt:0,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
+  // Saved members receive invitations; each participant must join for themselves.
   if(inv.length){note('Invitations sent for '+g.name,'mail',[0]);note(org.n+' invited you to '+g.name,'mail',inv);}
   note('Reminder set: ordering closes at '+tm(at),'clock',[0,...inv]); // only the people in this group
   setStep(4);say('Group created');
@@ -300,22 +324,24 @@ function App(){
   note('Group order cancelled','alert');setSheet(null);setScr('track');say('Group order cancelled');
  };
  const join=()=>{
-  if(invState!=='valid'||!pending||me.in)return;
-  upd(uid,{in:1,left:0});note(me.n+' joined '+g.name,'users');setScr('group');say('You joined '+g.name);
+  if(invitationStatus(Date.now(),uid,Gr.current,Pr.current)!=='valid')return;
+  setP(p=>p.map(x=>x.id===uid?{...x,in:1,left:0}:x));
+  note(me.n+' joined '+g.name,'users',[...mem(),uid]);setScr('group');say('You joined '+g.name);
  };
  const leave=()=>{
-  if(!pending)return;
-  upd(uid,{in:0,left:1,sub:null,items:[],paid:0,paidAmt:0,rw:null,pmeth:null,payFail:0});note(me.n+' left the group','door',[0]);setScr('group');
+  if(isOrg||!pending||!me.in)return;
+  upd(uid,{...blank(me),in:0,left:1});note(me.n+' left the group','door',[0]);setScr('group');
  };
  const removeP=p=>{
-  if(!isOrg||!pending)return;
-  upd(p.id,{in:0,sub:null,items:[],paid:0,paidAmt:0,rw:null,pmeth:null,payFail:0});note(p.n+' was removed from the group','alert');say(p.n+' removed');
+  if(!isOrg||!pending||p.org||!p.in)return;
+  upd(p.id,{...blank(p),in:0,left:0});
+  setG(x=>({...x,invitedIds:x.invitedIds.filter(id=>id!==p.id),removedIds:[...new Set([...x.removedIds,p.id])]}));
+  note(p.n+' was removed from the group','alert',[0,p.id]);say(p.n+' removed');
  };
- const addP=p=>{
-  if(!isOrg||!orderingOpen())return;
-  if(members.length>=g.size){say('Group is full ('+members.length+'/'+g.size+')',1);return}
-  upd(p.id,{in:1,left:0});note(p.n+' was added to '+g.name,'users',[...mem(),p.id]);
-  if(members.length+1>=g.size)say(p.n+' added. Group is now full ('+(members.length+1)+'/'+g.size+')'+(g.size>=MAXSIZE?', the maximum':''),1);else say(p.n+' added to the group');
+ const inviteP=p=>{
+  if(!isOrg||!orderingOpen()||p.org||p.in||g.invitedIds.includes(p.id))return;
+  setG(x=>({...x,invitedIds:[...x.invitedIds,p.id],removedIds:x.removedIds.filter(id=>id!==p.id)}));
+  note(org.n+' invited you to '+g.name,'mail',[p.id]);note('Invitation sent to '+p.n,'mail',[0]);say('Invitation sent to '+p.n);
  };
  const canExtend=now=>isOrg&&pending&&!g.extensionUsed&&Math.max(g.deadlineAt,now)+15*60000<slotAt;
  const extend=()=>{
@@ -336,9 +362,15 @@ function App(){
   if(saved.some(s=>s.name===g.name))return say('Already saved');
   setSaved(s=>[...s,{name:g.name,members:members.map(x=>x.n)}]);say('Group saved');
  };
- const copyLink=()=>{
-  try{navigator.clipboard.writeText('https://yakun.app/together/'+g.gid).catch(()=>{})}catch(e){}
-  say('Invite link copied');
+ const copyLink=async()=>{
+  if(!isOrg||!pending)return;
+  try{
+   if(typeof navigator==='undefined'||!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');
+   await navigator.clipboard.writeText(inviteUrl);
+   setSheet({k:'invite',copied:true});say('Invitation link copied');
+  }catch{
+   setSheet({k:'invite',copied:false});say('Could not copy the link. Copy it manually below.');
+  }
  };
  const remind=(p,type)=>{
   note('Reminder sent to '+p.n+': '+type,'clock',[uid]); // confirmation for the organiser only
@@ -496,15 +528,15 @@ function App(){
   <div className="body">
   {tab==='order'&&<div className="seg">{[['menu','Menu'],['cart','My order'],['group','Group'],['track','Status']].map(([k,l])=><button key={k} className={(scr===k||(k==='track'&&scr==='done'))?'on':''} onClick={()=>setScr(k==='track'&&g.sent?'done':k)}>{l}{k==='cart'&&me.items.length>0&&<i className="badge">{me.items.length}</i>}</button>)}</div>}
   {tab==='order'&&g.live&&g.cancelled&&<Ban c="e">This group order was cancelled. {isOrg&&<button className="link" onClick={newOrder}>Start a new order</button>}</Ban>}
-  {tab==='order'&&g.live&&!g.sent&&!g.cancelled&&<TimerBar deadlineAt={g.deadlineAt} closed={g.closed}/>}
-  {tab==='order'&&pending&&g.extensionUsed&&<Ban>One 15-minute extension used. Collection stays at {g.slot}.{advanceExtensionApplies(g.slot,Date.now())&&' Original advance qualification is retained until '+tm(g.extensionUntil)+'.'}</Ban>}
+  {tab==='order'&&(me.in||hasInvite)&&g.live&&!g.sent&&!g.cancelled&&<TimerBar deadlineAt={g.deadlineAt} closed={g.closed}/>}
+  {tab==='order'&&(me.in||hasInvite)&&pending&&g.extensionUsed&&<Ban>One 15-minute extension used. Collection stays at {g.slot}.{advanceExtensionApplies(g.slot,Date.now())&&' Original advance qualification is retained until '+tm(g.extensionUntil)+'.'}</Ban>}
   {tab==='order'&&isOrg&&g.expired&&!g.sent&&!g.cancelled&&<div className="card"><b>Time is up</b><div className="mute" style={{margin:'6px 0 14px'}}>{subm.length} of {members.length} people submitted.</div>{expiredBtns}</div>}
 
   {screen==='home'&&<>
    {isOrg&&<div className="hero"><h2>Breakfast for the whole team, one order.</h2><p className="mute" style={{marginBottom:14}}>Everyone picks their own food, pays for their own order and earns their own Cherish points.</p>{(()=>{const active=g.live&&!g.cancelled&&!(g.sent&&g.status==='collected');return <button className="btn" onClick={()=>active?setScr(g.sent?'done':'group'):newOrder()}>{active?(g.sent?'View my group order':'Open my group order'):'Start Ya Kun Together'}</button>})()}</div>}
    <div className="card row"><div className="av"><Icon n="star"/></div><div className="sp"><b>Cherish account</b><div className="mute">{me.n} · linked</div></div><div style={{textAlign:"right"}}><div className="big" style={{fontSize:26}}>{avail}</div></div></div>
    {g.live&&me.in?<div className="card click" onClick={()=>setScr(g.sent?'done':'group')} style={{borderColor:'var(--red)'}}><b>{g.name}</b><div className="mute">{statusText}{!g.closed&&!g.sent&&!g.cancelled&&<ClosesIn target={g.deadlineAt}/>}</div></div>
-    :g.live&&!g.cancelled?<div className="card click" onClick={()=>setScr('join')} style={{borderColor:'var(--red)'}}><b>{org.n} invited you to {g.name}</b><div className="mute">Tap to view the invitation</div></div>
+    :g.live&&hasInvite&&!g.cancelled?<div className="card click" onClick={openInvite} style={{borderColor:'var(--red)'}}><b>{org.n} invited you to {g.name}</b><div className="mute">Tap to view the invitation</div></div>
     :!isOrg&&<div className="card mute">No active group order right now. You can still browse the menu and your rewards, and join as soon as you get an invitation link.</div>}
    <button className="btn ghost" style={{marginBottom:12}} onClick={()=>setScr('menu')}>Browse the menu</button>
    <button className="btn ghost" onClick={()=>setScr('repeat')}>Saved groups and previous orders</button>
@@ -550,41 +582,40 @@ function App(){
    </>}
    {step===4&&<>
     <div className="hero" style={{textAlign:'center'}}><Icon n="check" s={44}/><h2 style={{marginTop:10}}>Your group is ready</h2><div className="mute">{g.name}<br/>{collectionName} · {g.slot} · ordering closes {g.deadline}</div></div>
-    <div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div><button className="btn sm" onClick={copyLink}>Copy link</button></div>
-    <div className="mute">Share the link so friends can join.</div>
+    <div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>{inviteUrl}</div><button className="btn sm" onClick={copyLink}>Copy link</button></div>
+    <div className="mute">Invite people by account in View group. They sign in and choose Join group in this demo tab.</div>
     <div className="sticky"><button className="btn" onClick={()=>setScr('menu')}>Begin my order</button><button className="btn ghost" style={{marginTop:10}} onClick={()=>setScr('group')}>View group</button></div>
    </>}
   </>}
 
   {screen==='gate'&&<>
    {!!me.left&&<Ban>You left this group.</Ban>}
-   <div className="card"><b>{g.live&&!g.cancelled?"You haven't joined "+g.name:'No group order yet'}</b>
-    <div className="mute" style={{margin:'6px 0 14px'}}>{g.live&&!g.cancelled?'Join to add items, pay and track the order. You can keep browsing in the meantime.':isOrg?'Start Ya Kun Together to order with your team.':'Ask the organiser for an invitation link. You can keep browsing in the meantime.'}</div>
-    <div className="col">{g.live&&!g.cancelled&&<button className="btn" onClick={()=>setScr('join')}>View invitation</button>}{isOrg&&!g.live&&<button className="btn" onClick={newOrder}>Start Ya Kun Together</button>}<button className="btn ghost" onClick={()=>setScr('menu')}>Browse the menu</button></div></div>
+   <div className="card"><b>{g.live&&hasInvite&&!g.cancelled?"You haven't joined "+g.name:'No group order yet'}</b>
+    <div className="mute" style={{margin:'6px 0 14px'}}>{g.live&&hasInvite&&!g.cancelled?'Join to add items, pay and track the order. You can keep browsing in the meantime.':isOrg?'Start Ya Kun Together to order with your team.':'Ask the organiser for an invitation link. You can keep browsing in the meantime.'}</div>
+    <div className="col">{g.live&&hasInvite&&!g.cancelled&&<button className="btn" onClick={openInvite}>View invitation</button>}{isOrg&&!g.live&&<button className="btn" onClick={newOrder}>Start Ya Kun Together</button>}<button className="btn ghost" onClick={()=>setScr('menu')}>Browse the menu</button></div></div>
   </>}
 
   {screen==='join'&&<>
-   <div className="hero"><h2>{invState==='valid'?org.n+' invited you to '+g.name:"This invitation can't be used"}</h2>
-    {invState==='valid'&&g.live&&<p className="mute">Deadline {g.deadline} · {collectionName} · {outlet.n} · collect at {g.slot}<br/>{g.pay==='sponsor'?org.n+' is paying for everyone':'Everyone pays for their own order'}</p>}</div>
-   {!!me.left&&<Ban>You left this group.</Ban>}
-   {invState==='expired'&&<Ban c="e">This invitation link is invalid or has expired. Ask {org.n} for a new link.</Ban>}
-   {invState==='full'&&<Ban c="e">This group is full ({members.length}/{g.size}). Ask {org.n} to raise the group size.</Ban>}
-   {!g.live&&<Ban>The organiser hasn't created this group yet.</Ban>}
-   <button className="btn" disabled={invState!=='valid'||!g.live} onClick={join}>Join group</button>
+   <div className="hero"><h2>{invState==='valid'?org.n+' invited you to '+g.name:'Group invitation'}</h2>
+    {invState==='valid'&&<p className="mute">Deadline {g.deadline} · {collectionName} · {outlet.n} · collect at {g.slot}<br/>Everyone pays for their own order</p>}</div>
+   {!!me.left&&hasInvite&&<Ban>You left this group. You can rejoin while ordering is open and a place is available.</Ban>}
+   {invitationMessages[invState]&&<Ban c={invState==='joined'?'k':'e'}>{invitationMessages[invState]}</Ban>}
+   <button className="btn" disabled={invState!=='valid'} onClick={join}>Join group</button>
+   {!!me.in&&(invState==='joined'||invState==='sent')&&<button className="btn ghost" style={{marginTop:10}} onClick={()=>setScr(g.sent?'done':'group')}>{g.sent?'View collection details':'View group'}</button>}
   </>}
 
   {screen==='group'&&(!g.live?<div className="card"><div className="mute">No group order yet.</div>{isOrg&&<button className="btn" style={{marginTop:10}} onClick={newOrder}>Start Ya Kun Together</button>}</div>:<>
    <div className="card"><div className="row"><b className="sp">{g.name}</b><Tag c={g.sent?'ok':g.closed?'':'w'}>{statusText}</Tag></div>
     {infoRows(false)}</div>
-   {isOrg&&pending&&<div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div><button className="btn sm" onClick={copyLink}>Copy link</button></div>}
+   {isOrg&&pending&&<div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>{inviteUrl}</div><button className="btn sm" onClick={copyLink}>Copy link</button></div>}
    <div className="h3">Members ({members.length}/{g.size})</div>
    {members.map(p=><div className={'card row'+(p.id===uid?' mine':'')} key={p.id}><div className="av">{p.n[0]}</div><div className="sp"><b>{p.n}{p.org?' (organiser)':''}</b>{isOrg&&<div className="mute">{p.sub?'Order submitted':g.closed?'Missed deadline':waitText(p)}</div>}</div>
     {isOrg&&!p.org&&pending&&<button className="btn sm ghost" onClick={()=>setSheet({k:'confirm',title:'Remove '+p.n+'?',msg:`${p.n}'s order will be cleared and they will need a new invite to rejoin.`,label:'Remove',action:()=>{removeP(p);setSheet(null)}})}>Remove</button>}</div>)}
    {isOrg&&!g.sent&&!g.cancelled&&!g.closed&&(()=>{const outside=P.filter(p=>!p.in),full=members.length>=g.size;return outside.length>0&&<>
-    <div className="h3">Add people</div>
+    <div className="h3">Invite people</div>
     {full&&<Ban>{g.size>=MAXSIZE?`Group is full (maximum ${MAXSIZE} people).`:`Group is full (${members.length}/${g.size}).`} {g.size<MAXSIZE&&<button className="link" onClick={()=>setSheet({k:'slot'})}>Raise group size</button>}</Ban>}
     {outside.map(p=><div className="card row" key={p.id}><div className="av">{p.n[0]}</div><div className="sp"><b>{p.n}</b>{p.left?<div className="mute">Left this group</div>:null}</div>
-     <button className="btn sm" disabled={full} aria-label={'Add '+p.n} onClick={()=>addP(p)}>Add</button></div>)}</>})()}
+     <button className="btn sm" aria-label={'Invite '+p.n} onClick={()=>inviteP(p)} disabled={g.invitedIds.includes(p.id)}>{g.invitedIds.includes(p.id)?'Invited':'Invite'}</button></div>)}</>})()}
    {isOrg&&pending&&<div className="row" style={{marginTop:6}}><button className="btn ghost sm pair" disabled={!canExtend(Date.now())} onClick={extend}>Extend 15 minutes</button><button className="btn sm pair" disabled={g.closed} onClick={()=>setSheet({k:'confirm',title:'Close ordering now?',msg:"Nobody will be able to submit or change an order after this, even if the deadline hasn't passed.",label:'Close ordering',action:()=>{closeEarly();setSheet(null)}})}>Close ordering</button></div>}
    {isOrg&&!g.sent&&!g.cancelled&&<button className="btn ghost" style={{marginTop:12}} onClick={()=>setSheet({k:'slot'})}>Change pickup time or group size</button>}
    {isOrg&&<button className="btn ghost" style={{marginTop:12}} onClick={saveGroup}>Save this group</button>}
@@ -598,7 +629,7 @@ function App(){
    <select id="menu-category" className="menu-select" value={cat} onChange={e=>setCat(e.target.value)}>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select>
    {MENU.filter(m=>m.cat===cat).map(m=>{const out=bad({items:[m]}).length>0;return <div className="card row menu-card" key={m.id} style={{opacity:out?.6:1}}><div className="em"><MenuImage item={m}/></div><div className="sp"><b>{m.name}</b><div className="mute">{m.desc}</div><b style={{color:'var(--red)'}}>{m.set?'From ':''}{$(m.price)}</b> {out&&<Tag c="w">Unavailable</Tag>}</div>
     <button className="add" disabled={!editable||out} aria-label={'Add '+m.name} onClick={()=>setSheet({k:'item',m,drink:SET_DRINKS[0].name,sw:'Normal',q:1})}>+</button></div>})}
-   {!editable&&!(g.live&&me.in)&&<div className="card row"><div className="sp mute">{g.live&&!g.cancelled?'Join '+g.name+' to add items.':isOrg?'Start a group order to add items.':'Join a group order to add items.'}</div>{g.live&&!g.cancelled?<button className="btn sm" onClick={()=>setScr('join')}>View invitation</button>:isOrg&&<button className="btn sm" onClick={newOrder}>Start</button>}</div>}
+   {!editable&&!(g.live&&me.in)&&<div className="card row"><div className="sp mute">{g.live&&hasInvite&&!g.cancelled?'Join '+g.name+' to add items.':isOrg?'Start a group order to add items.':'Join a group order to add items.'}</div>{g.live&&hasInvite&&!g.cancelled?<button className="btn sm" onClick={openInvite}>View invitation</button>:isOrg&&<button className="btn sm" onClick={newOrder}>Start</button>}</div>}
    {cart.items.length>0&&<div className="sticky"><button className="btn" onClick={()=>setScr('cart')}>View my order · {$(sum(cart.items))}</button></div>}
   </>}
 
@@ -782,8 +813,8 @@ function App(){
     </>}
     <div className="h3">Who got what</div><div className="card">{Object.entries(h.orders).map(([k,o])=><div key={k} style={{padding:'6px 0'}}><b>{USERS0[k].n}{+k===uid?' (you)':''}</b>{o.items.map((i,x)=><div className="mute" key={x}>{itemLine(i)}</div>)}{o.free&&<div className="mute">Free {o.free} (reward)</div>}</div>)}{isOrg&&<div className="row" style={{marginTop:6}}><span className="sp mute">Group total</span><b>{$(h.total)}</b></div>}</div>
     {m&&<button className="btn" style={{marginTop:14}} onClick={()=>reorder(h)}>Reorder with changes</button>}</>})()}
-   {sheet.k==='invite'&&<><div className="row"><Icon n="check" s={26}/><b style={{fontSize:18}}>Invite link copied</b></div>
-    <div className="card mute" style={{marginTop:12,wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div>
+   {sheet.k==='invite'&&<><div className="row"><Icon n={sheet.copied?'check':'mail'} s={26}/><b style={{fontSize:18}}>{sheet.copied?'Invitation link copied':'Copy invitation link'}</b></div><label className="l" htmlFor="invitation-link">Invitation link</label><input id="invitation-link" readOnly value={inviteUrl}/><div className="mute">{sheet.copied?'Use this invitation in the current demo tab.':'Clipboard unavailable. Select and copy the link manually.'} Named accounts must be invited first. New tabs and refreshes have no shared order data.</div>
+    <div className="card mute" style={{marginTop:12,wordBreak:'break-all'}}>{inviteUrl}</div>
     <div className="h3" style={{marginTop:4}}>Group order right now</div>
     <div className="card"><b>{g.name}</b><div className="mute" style={{margin:'4px 0 8px'}}>Organiser {org.n} · Deadline {g.deadline}<br/>{collectionName} · {outlet.n} · collect at {g.slot}<br/>{g.pay==='sponsor'?org.n+' is paying for everyone':'Everyone pays for their own order'}</div>
      {members.map(p=><div key={p.id} style={{padding:'5px 0',borderTop:'1px solid var(--line)'}}><b>{p.n}</b> <span className="mute">{p.sub?lines(p):waitText(p)}</span></div>)}
@@ -810,7 +841,7 @@ function App(){
      ['Collection slot fills up',()=>{setG(x=>({...x,slotGone:true}));note(g.slot+' is no longer available','alert');setSheet(null)}],
      ['Advance order status (outlet)',()=>{advance();setSheet(null)}]].filter(([title])=>isOrg||title!=='Others submit their orders').map(([t,f])=><button key={t} className="btn ghost sm" style={{width:'100%',marginBottom:8}} onClick={f}>{t}</button>)}
     <label className="l">Decline payment when the order is sent</label><div className="chips">{members.filter(p=>canSeePayment(p)&&(g.pay==='individual'||p.org)).map(p=><button key={p.id} className={'chip '+(g.failFor.includes(p.id)?'on':'')} onClick={()=>setG(x=>({...x,failFor:x.failFor.includes(p.id)?x.failFor.filter(i=>i!==p.id):[...x.failFor,p.id]}))}>{p.n}{p.org?' (organiser)':''}</button>)}</div><div className="mute" style={{marginTop:6}}>{isOrg?'Highlighted people':'Your highlighted account'} {isOrg?'have their':'has its'} payment declined once when the organiser sends the order (a submitted order with an amount to pay is required). The order is not sent until they choose another method.</div>
-    <label className="l">Invitation link</label><div className="chips">{['valid','expired','full'].map(v=><button key={v} className={'chip '+(g.inv===v?'on':'')} onClick={()=>setG(x=>({...x,inv:v}))}>{v}</button>)}</div>
+    {isOrg&&<><label className="l">Invitation link</label><div className="chips">{['valid','expired','full'].map(v=><button key={v} className={'chip '+(g.inv===v?'on':'')} onClick={()=>{if(isOrg)setG(x=>({...x,inv:v}))}}>{v}</button>)}</div></>}
     <button className="btn ghost sm" style={{width:'100%',marginTop:14}} onClick={()=>window.location.reload()}>Reset demo</button></>}
   </div></div>}
   {banner&&<div className="push" onClick={()=>{setBanners([]);markSeen();setScr('notifs')}}><Icon n={banner.i} s={18}/><div className="sp"><b>Ya Kun Together</b><div className="mute">{banner.t}</div></div></div>}
