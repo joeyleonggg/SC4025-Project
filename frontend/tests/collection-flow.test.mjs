@@ -9,10 +9,10 @@ import * as data from '../src/data.js';
 const require=createRequire(import.meta.url);
 const source=transformSync(readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8'),{loader:'jsx',format:'cjs',jsx:'automatic'}).code;
 const minute=60000;
-// Run the real App handlers with controlled time/state, without browser timers.
+// Run real App handlers with controlled time/state; reminder tests also run effects and scheduled timers.
 function app(at='2026-11-16T09:01:00+08:00',options={}){
  let now=Date.parse(at),cursor=0;
- const state=[],copiedLinks=[],events={},effects=[];let mounted=false;
+ const state=[],copiedLinks=[],events={},effects=[],effectSlots=[],pendingEffects=[],timers=new Map();let mounted=false,dirty=false,effectCursor=0,timerSequence=0;
  const browserWindow={location:{origin:'http://localhost:5173',pathname:'/',hash:options.hash||''},addEventListener:(name,fn)=>{events[name]=fn;},removeEventListener:name=>{delete events[name];}};
  const navigator=options.clipboard==='missing'?{}:{clipboard:{writeText:async text=>{if(options.clipboard==='reject')throw new Error('Denied');copiedLinks.push(text);}}};
  class TestDate extends Date{
@@ -20,12 +20,32 @@ function app(at='2026-11-16T09:01:00+08:00',options={}){
   static now(){return now;}
  }
  const hooks={
-  useState(initial){const i=cursor++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return [state[i],value=>{state[i]=typeof value==='function'?value(state[i]):value;}];},
-  useRef(value){const i=cursor++;return state[i]??={current:value};},useEffect(effect,deps){if(!mounted&&deps?.length===0)effects.push(effect);}
+  useState(initial){const i=cursor++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return [state[i],value=>{const next=typeof value==='function'?value(state[i]):value;if(!Object.is(state[i],next))dirty=true;state[i]=next;}];},
+  useRef(value){const i=cursor++;return state[i]??={current:value};},useEffect(effect,deps){
+   if(!options.enableTimers){if(!mounted&&deps?.length===0)effects.push(effect);return;}
+   const i=effectCursor++,previous=effectSlots[i];
+   if(previous&&deps?.every((value,index)=>Object.is(value,previous.deps?.[index]))&&deps.length===previous.deps?.length)return;
+   effectSlots[i]={deps,effect,cleanup:previous?.cleanup};
+   pendingEffects.push(()=>{previous?.cleanup?.();effectSlots[i].cleanup=effect();});
+  }
  };
  const module={exports:{}};
- vm.runInNewContext(source,{module,Date:TestDate,window:browserWindow,navigator,URLSearchParams,setTimeout(){},clearTimeout(){},require:name=>name==='react'?hooks:name==='./data'?data:name==='./styles.css'?{}:require(name)});
- const render=()=>{cursor=0;const tree=module.exports.default();if(!mounted){mounted=true;for(const effect of effects)effect();}return tree;};
+ vm.runInNewContext(source,{module,Date:TestDate,window:browserWindow,navigator,URLSearchParams,setTimeout(fn,delay=0){if(!options.enableTimers)return;const id=++timerSequence;timers.set(id,{id,fn,due:now+Math.max(0,delay)});return id;},clearTimeout(id){timers.delete(id);},require:name=>name==='react'?hooks:name==='./data'?data:name==='./styles.css'?{}:require(name)});
+ const render=()=>{
+  let tree,passes=0;
+  do{
+   assert(passes++<30,'Render effects did not settle');cursor=0;effectCursor=0;dirty=false;pendingEffects.length=0;
+   tree=module.exports.default();
+   if(options.enableTimers){mounted=true;for(const effect of pendingEffects)effect();}
+   else if(!mounted){mounted=true;for(const effect of effects)effect();}
+  }while(options.enableTimers&&dirty);
+  return tree;
+ };
+ const advanceTo=target=>{
+  assert(target>=now);render();let runs=0;
+  while(true){const timer=[...timers.values()].filter(t=>t.due<=target).sort((a,b)=>a.due-b.due||a.id-b.id)[0];if(!timer)break;assert(runs++<10000);now=timer.due;timers.delete(timer.id);timer.fn();render();}
+  now=target;render();
+ };
  function* walk(node){
   if(Array.isArray(node)){for(const child of node)yield*walk(child);}
   else if(node?.props){yield node;yield*walk(node.type?.name==='PickupChoices'?node.type(node.props):node.props.children);}
@@ -47,7 +67,7 @@ function app(at='2026-11-16T09:01:00+08:00',options={}){
  };
  const create=()=>{click('Next: ordering time');click('Create group');assert(g().live);click('View group');};
  const submit=()=>{click('Menu');aria('Add '+data.MENU.find(m=>m.id===1).name);click('Add to order · $6.30');click('View my order · $6.30');click('Submit my order');click('Confirm payment method');click('Status');click('Close ordering early');click('Close ordering');};
- return {state,g,copiedLinks,events,browserWindow,find,button,click,aria,select,option,text,label,choose,start,create,submit,now:()=>now,at:value=>{now=value;}};
+ return {state,g,copiedLinks,events,browserWindow,advanceTo,timers,find,button,click,aria,select,option,text,label,choose,start,create,submit,now:()=>now,at:value=>{now=value;}};
 }
 
 test('pickup retains quick choices, includes preparation time and rejects stale creation',()=>{
@@ -177,10 +197,10 @@ test('switching to pickup removes the bonus and cancelling earns no points',()=>
  a.click('Group');a.click('Cancel group order');a.find(n=>n.type==='button'&&n.props.className==='btn'&&n.props.children==='Cancel group order').props.onClick();assert(a.g().cancelled);assert.equal(a.state[6][0].pts,initial);assert.equal(a.state[6][0].earned,0);assert.equal(a.g().pointsBonus,0);
 });
 
-function personalOrder(a,q=1){
+function personalOrder(a,q=1,confirm=true){
  a.click('Menu');a.aria('Add '+data.MENU.find(m=>m.id===1).name);
  for(let i=1;i<q;i++)a.find(n=>n.type==='button'&&n.props.children==='+'&&!n.props['aria-label']).props.onClick();
- a.click('Add to order · $'+(6.3*q).toFixed(2));a.click('View my order · $'+(6.3*q).toFixed(2));a.click('Submit my order');a.click('Confirm payment method');
+ a.click('Add to order · $'+(6.3*q).toFixed(2));a.click('View my order · $'+(6.3*q).toFixed(2));a.click('Submit my order');if(confirm)a.click('Confirm payment method');
 }
 const cardButton=(a,id,method)=>a.find(n=>n.type==='button'&&n.props.className?.startsWith('opt ')&&JSON.stringify(n.props.children).includes('Card ending '+data.SAVED_CARDS[id].find(c=>c.id===method).last4));
 const switchUser=(a,name)=>{a.aria('Switch demo user');a.click(name);};
@@ -333,4 +353,87 @@ test('an invitation survives sign-in and a fresh tab explains missing mock state
  const fresh=app(undefined,{hash:'#invite='+a.g().inviteKey});
  for(const [placeholder,value]of [['you@example.com','ben@yakun.demo'],['Password','kaya1234']])fresh.find(n=>n.props.placeholder===placeholder).props.onChange({target:{value}});
  fresh.click('Log in');assert(fresh.text().includes('not available in this demo tab'));assert(fresh.button('Join group').props.disabled);
+});
+
+const autoReminders=a=>a.state[10].filter(n=>n.t.startsWith('Ordering closes soon.')||n.t.startsWith('Ordering is closed. Confirm'));
+function timedGroup(){const a=app(undefined,{enableTimers:true});a.start();a.choose(5);a.create();return a;}
+function missingPaymentGroup(){
+ const a=timedGroup();joinMember(a,'Ben');joinMember(a,'Calvin');a.aria('Invite Dylan');
+ switchUser(a,'Ben');a.click('Order');personalOrder(a,1,false);
+ switchUser(a,'Calvin');a.click('Order');personalOrder(a);
+ switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Group');return a;
+}
+
+test('two-minute timers target non-submitters and missing methods without reminding ready or unjoined people',()=>{
+ const a=missingPaymentGroup(),due=a.g().deadlineAt-2*minute;
+ a.advanceTo(due-1);assert.equal(autoReminders(a).length,0);a.advanceTo(due);
+ const reminders=autoReminders(a);assert.equal(reminders.length,2);
+ assert.deepEqual(Array.from(reminders.find(n=>n.t.includes('Submit your order')).to),[0]);
+ assert.deepEqual(Array.from(reminders.find(n=>n.t.includes('Confirm your payment method')).to),[1]);
+ assert(!reminders.some(n=>n.to.some(id=>id===2||id===3||id===4)));
+ for(const name of ['Ben','Calvin','Mary Ng (organiser)'])switchUser(a,name);
+ a.advanceTo(due+minute);assert.equal(autoReminders(a).length,2);
+ switchUser(a,'Calvin');a.aria('Notifications');assert(!a.text().includes('Confirm your payment method'));assert(!a.text().includes('Submit your order'));
+ switchUser(a,'Ben');a.aria('Notifications');assert(a.text().includes('Confirm your payment method'));assert(!a.text().includes('Submit your order'));
+});
+
+test('late submission gets a payment reminder once and readying a card stops further reminders',()=>{
+ const a=timedGroup();joinMember(a,'Ben');switchUser(a,'Ben');a.advanceTo(a.g().deadlineAt-2*minute);
+ assert.equal(autoReminders(a).filter(n=>n.to.includes(1)&&n.t.includes('Submit your order')).length,1);
+ a.click('Order');personalOrder(a,1,false);a.text();
+ assert.equal(autoReminders(a).filter(n=>n.to.includes(1)&&n.t.includes('Confirm your payment method')).length,1);
+ a.click('Confirm payment method');a.text();const count=autoReminders(a).length;
+ a.advanceTo(a.g().deadlineAt+minute);assert.equal(autoReminders(a).length,count);assert(a.g().closed);
+ assert.equal(a.state[8],null); // Deadline popup belongs to the organiser, not the current participant.
+});
+
+test('closing early reminds missing payers immediately; manual reminders stay targeted',()=>{
+ const a=missingPaymentGroup();a.click('Status');a.button('Remind').props.onClick({stopPropagation(){}});
+ const manual=a.state[10].find(n=>n.t.startsWith('Mary Ng sent you a reminder: choose a payment method'));
+ assert.deepEqual(Array.from(manual.to),[1]);assert.equal(autoReminders(a).length,0);
+ a.click('Close ordering early');a.click('Close ordering');a.text();
+ assert.equal(autoReminders(a).length,1);assert.deepEqual(Array.from(autoReminders(a)[0].to),[1]);
+ assert(autoReminders(a)[0].t.startsWith('Ordering is closed.'));a.advanceTo(a.g().deadlineAt+minute);assert.equal(autoReminders(a).length,1);
+});
+
+test('extension creates one new reminder window and old timers cannot close or remind the extended group',()=>{
+ const a=missingPaymentGroup(),oldDeadline=a.g().deadlineAt,oldDue=oldDeadline-2*minute;
+ const oldClose=[...a.timers.values()].find(t=>t.due===oldDeadline).fn;
+ const oldReminder=[...a.timers.values()].find(t=>t.due===oldDue).fn;
+ a.advanceTo(oldDue);assert.equal(autoReminders(a).length,2);a.click('Extend 15 minutes');a.text();const extended=a.g().deadlineAt;
+ oldReminder();a.text();assert.equal(autoReminders(a).length,2);
+ a.advanceTo(oldDeadline);oldClose();a.text();assert(!a.g().closed);
+ a.advanceTo(extended-2*minute);assert.equal(autoReminders(a).filter(n=>n.to.includes(1)&&n.t.includes('Confirm your payment method')).length,2);
+ a.advanceTo(extended);assert(a.g().closed);assert.equal(a.state[10].filter(n=>n.t==='Ordering closed: time is up').length,1);
+});
+
+for(const ending of ['cancelled','sent'])test('stale reminder and closure timers do nothing after '+ending,()=>{
+ const a=timedGroup(),deadline=a.g().deadlineAt;
+ const old=[...a.timers.values()].filter(t=>t.due===deadline||t.due===deadline-2*minute).map(t=>t.fn);
+ if(ending==='cancelled'){a.click('Cancel group order');a.find(n=>n.type==='button'&&n.props.className==='btn'&&n.props.children==='Cancel group order').props.onClick();}
+ else{a.submit();a.click('Send group order to outlet');}
+ a.text();for(const callback of old)callback();a.text();a.advanceTo(deadline+minute);
+ assert.equal(autoReminders(a).length,0);assert.equal(a.state[10].filter(n=>n.t==='Ordering closed: time is up').length,0);assert(a.g()[ending]);
+});
+
+test('stale timers from a cancelled group cannot affect its replacement',()=>{
+ const a=timedGroup(),deadline=a.g().deadlineAt;
+ const old=[...a.timers.values()].filter(t=>t.due===deadline||t.due===deadline-2*minute).map(t=>t.fn);
+ a.click('Cancel group order');a.find(n=>n.type==='button'&&n.props.className==='btn'&&n.props.children==='Cancel group order').props.onClick();
+ a.advanceTo(a.now()+minute);a.click('Home');a.click('Start Ya Kun Together');a.click('Next: choose pickup');a.choose(5);a.create();
+ a.advanceTo(deadline);const before=autoReminders(a).length;for(const callback of old)callback();a.text();assert.equal(autoReminders(a).length,before);assert(!a.g().closed);
+});
+
+test('zero-pay orders, departed members and decline recovery do not get redundant automatic payment reminders',()=>{
+ const a=missingPaymentGroup();
+ // A zero-price submitted mock order requires no card, and a departed participant is no longer a recipient.
+ a.state[6]=a.state[6].map(p=>p.id===1?{...p,items:[],sub:{items:[],rw:null},pmeth:null}:p.id===2?{...p,in:0,pmeth:null}:p);a.text();
+ a.advanceTo(a.g().deadlineAt-2*minute);assert(!autoReminders(a).some(n=>n.to.includes(1)||n.to.includes(2)));
+ const b=timedGroup();personalOrder(b);b.click('Status');b.click('Close ordering early');b.click('Close ordering');b.state[7]={...b.g(),failFor:[0]};b.click('Send group order to outlet');b.text();
+ assert.equal(autoReminders(b).length,0);assert(b.state[10].some(n=>n.t.includes('was declined. Choose another saved card')));
+});
+
+test('deadline expiration does not open the organiser popup on the logged-out screen',()=>{
+ const a=timedGroup();a.click('More');a.find(n=>n.props.className==='card row click'&&a.label(n)==='Log out').props.onClick();a.text();
+ a.advanceTo(a.g().deadlineAt);assert(a.g().closed);assert.equal(a.state[8],null);assert(a.text().includes('Log in'));
 });

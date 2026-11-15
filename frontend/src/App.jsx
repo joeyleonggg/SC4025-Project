@@ -84,7 +84,7 @@ const lines = p => p.items.map(itemLine).concat(freeOf(p) ? [freeTxt(p)] : []).j
 const waitText = p => p.items.length ? 'Still choosing' : 'Not ordered yet';
 const blank = p => ({...p,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:null,payFail:0,failedMethods:[],rw:null,earned:0,left:0,in:p.org?1:0});
 const submitted = p => p.sub ? {...p,...p.sub} : p;
-const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[],collectionMode:'pickup',advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0,extensionUsed:false,extensionUntil:0,advanceExtensionSlotAt:0,pointsBonus:0};
+const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[],collectionMode:'pickup',advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0,extensionUsed:false,extensionUntil:0,advanceExtensionSlotAt:0,pointsBonus:0};
 // n = how many group orders this session has already finished, so every new group gets its own order id and collection number.
 const slotSet = (win=10) => {
  const now=Date.now(),ms=makeSlotMs(now);
@@ -123,6 +123,8 @@ function App(){
  const [inviteRequest,setInviteRequest]=useState(readInviteKey);
  const nid=useRef(0), toastT=useRef(null), Pr=useRef(null),Gr=useRef(null);
  const collectedGroup=useRef(null),sentGroup=useRef(null);
+ const reminderLedger=useRef(new Set()),viewer=useRef({id:uid,screen:scr});
+ viewer.current={id:uid,screen:scr};
 
  const isOrg=uid===0, draft=P[uid], me=submitted(draft), org=P[0];
  const outlet={n:OUTLET_CAPS[g.oi].n,w:OUTLET_CAPS[g.oi].w,slots:Object.fromEntries(g.slotTimes.map((t,i)=>[t,OUTLET_CAPS[g.oi].caps[i]??OUTLET_CAPS[g.oi].laterCap]))};
@@ -279,13 +281,43 @@ function App(){
  };
 
 
+ // Closing and reminders use current refs so an old timer cannot act on a new deadline or group.
  useEffect(()=>{
   if(!g.live||g.closed||g.sent||g.cancelled)return;
-  const msLeft=g.deadlineAt-Date.now(), timers=[];
-  if(!g.reminded&&msLeft>0)timers.push(setTimeout(()=>{setG(x=>x.reminded||x.closed||x.sent||x.cancelled?x:{...x,reminded:true});const rec=Pr.current.filter(p=>p.in&&!p.sub).map(p=>p.id);if(rec.length){note('2 minutes left to submit your order','clock',rec);if(rec.includes(uid))say('2 minutes left to order')}},Math.max(0,msLeft-120000)));
-  timers.push(setTimeout(()=>{setG(x=>x.closed||x.sent||x.cancelled?x:{...x,closed:true,expired:true});note('Ordering closed: time is up','clock');if(uid===0)setSheet({k:'expired'})},Math.max(0,msLeft)));
-  return ()=>timers.forEach(clearTimeout);
- },[g.deadlineAt,g.live,g.closed,g.sent,g.cancelled,g.reminded,uid]);
+  const key=g.inviteKey,deadline=g.deadlineAt;
+  const timer=setTimeout(()=>{
+   const current=Gr.current,now=Date.now();
+   if(current.inviteKey!==key||current.deadlineAt!==deadline||!current.live||current.closed||current.sent||current.cancelled||now<deadline)return;
+   const marker=key+':'+deadline+':closed';
+   if(reminderLedger.current.has(marker))return;
+   reminderLedger.current.add(marker);
+   setG(x=>x.inviteKey!==key||x.deadlineAt!==deadline||x.closed||x.sent||x.cancelled?x:{...x,closed:true,expired:true});
+   note('Ordering closed: time is up','clock',Pr.current.filter(p=>p.in).map(p=>p.id));
+   if(viewer.current.id===0&&viewer.current.screen!=='login')setSheet({k:'expired'});
+  },Math.max(0,deadline-Date.now()));
+  return()=>clearTimeout(timer);
+ },[g.inviteKey,g.deadlineAt,g.live,g.closed,g.sent,g.cancelled]);
+ useEffect(()=>{
+  if(!g.live||g.sent||g.cancelled)return;
+  const key=g.inviteKey,deadline=g.deadlineAt;
+  const dispatch=()=>{
+   const current=Gr.current,now=Date.now();
+   if(current.inviteKey!==key||current.deadlineAt!==deadline||!current.live||current.sent||current.cancelled)return;
+   if(!current.closed&&now<deadline-120000)return;
+   for(const person of Pr.current.filter(p=>p.in)){
+    const p=submitted(person);
+    const kind=!current.closed&&now<deadline&&!p.sub?'order':needsMethod(p)&&!p.payFail?'payment':null;
+    if(!kind)continue;
+    const marker=key+':'+deadline+':'+kind+':'+p.id;
+    if(reminderLedger.current.has(marker))continue;
+    reminderLedger.current.add(marker);
+    note(kind==='order'?'Ordering closes soon. Submit your order before '+tm(deadline)+'.':current.closed?'Ordering is closed. Confirm your payment method so the group order can be sent.':'Ordering closes soon. Confirm your payment method so the group order can be sent.','clock',[p.id]);
+   }
+  };
+  if(g.closed||Date.now()>=deadline-120000){dispatch();return;}
+  const timer=setTimeout(dispatch,deadline-120000-Date.now());
+  return()=>clearTimeout(timer);
+ },[g.inviteKey,g.deadlineAt,g.live,g.closed,g.sent,g.cancelled,P]);
  const createGroup=()=>{
   if(!isOrg||g.live)return;
   const now=Date.now(), at=now+g.win*60000;
@@ -294,7 +326,7 @@ function App(){
   }
   if(at>=slotAt)return say('Choose a shorter ordering time or a later pickup');
   const inv=P.filter(x=>!x.org&&preset.includes(x.n)).slice(0,g.size-1).map(x=>x.id);
-  setG(x=>({...x,pay:'individual',live:true,invitedIds:inv,removedIds:[],advanceQualified:x.collectionMode==='advance',advanceQualifiedAt:x.collectionMode==='advance'?now:0,advanceDeadlineAt:x.collectionMode==='advance'?at:0,advanceSlotAt:x.collectionMode==='advance'?slotAt:0,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
+  setG(x=>({...x,pay:'individual',live:true,invitedIds:inv,removedIds:[],advanceQualified:x.collectionMode==='advance',advanceQualifiedAt:x.collectionMode==='advance'?now:0,advanceDeadlineAt:x.collectionMode==='advance'?at:0,advanceSlotAt:x.collectionMode==='advance'?slotAt:0,deadlineAt:at,deadline:tm(at),closed:false,expired:false,cancelled:false}));
   // Saved members receive invitations; each participant must join for themselves.
   if(inv.length){note('Invitations sent for '+g.name,'mail',[0]);note(org.n+' invited you to '+g.name,'mail',inv);}
   note('Reminder set: ordering closes at '+tm(at),'clock',[0,...inv]); // only the people in this group
@@ -350,7 +382,7 @@ function App(){
   const now=Date.now(),at=Math.max(g.deadlineAt,now)+15*60000;
   if(at>=slotAt)return say('Choose a later collection time for the full 15-minute extension');
   const keepsAdvance=g.collectionMode==='advance'&&g.advanceQualified&&g.advanceSlotAt===slotAt&&slotAt>=g.advanceDeadlineAt+120*60000;
-  setG(x=>({...x,deadlineAt:at,deadline:tm(at),closed:false,expired:false,reminded:false,extensionUsed:true,extensionUntil:at,advanceExtensionSlotAt:keepsAdvance?slotAt:0}));
+  setG(x=>({...x,deadlineAt:at,deadline:tm(at),closed:false,expired:false,extensionUsed:true,extensionUntil:at,advanceExtensionSlotAt:keepsAdvance?slotAt:0}));
   note('Deadline extended once by 15 minutes to '+tm(at)+'. Collection stays at '+g.slot+(keepsAdvance?'. Original advance qualification is retained during this extension.':'.'),'clock');
   say('Deadline extended to '+tm(at));setSheet(null);
  };

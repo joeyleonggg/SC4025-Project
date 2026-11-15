@@ -156,7 +156,11 @@ Replace the placeholder invitation experience with a working mock flow appropria
 
 ### A11 Automatic payment reminders
 
-**Status** Pending; coordinate with A08–A10.
+**Status** Complete. Delivery commit: `Add targeted automatic payment reminders`.
+
+**Verification** Production build and all thirty-nine automated checks passed. Nine controlled-clock cases cover targeting, late submission, deduplication, readiness, early closure/manual reminders, extension windows, stale callbacks after cancellation/sending/replacement, zero-pay/departed users, decline notices and logged-out popup behaviour.
+
+**Recorded timing** Use the two-minute warning window. Early closure immediately checks missing payment methods. Allow one automatic reminder per person, kind and deadline; a new extended deadline has a fresh allowance. Declines retain their existing targeted recovery notice without an extra automatic payment reminder.
 
 **Requirement** Section 3.5.3, FR-02 and FR-09.
 
@@ -229,4 +233,4 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 
 For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-The next implementation item is A11, automatic payment reminders. Unresolved policy details remain recorded above for discussion.
+The next implementation item is A12, joining notice and marketing consent. Unresolved policy details remain recorded above for discussion.

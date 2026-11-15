@@ -105,3 +105,11 @@ Non-invited accounts cannot join. Removed members need a fresh invitation; peopl
 Links point to this app and open the invitation in the same running demo tab. New tabs, refreshes and other devices have no shared order state. Clipboard failures offer the link for manual copying instead of reporting success.
 
 See [the invitation flow and test steps](docs/improvements/09-invitations.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.
+
+## Automatic reminders
+
+At two minutes before the deadline, joined non-submitters receive an order reminder and submitted participants missing a valid payment method receive a payment reminder. Ready accounts, zero-pay orders and people who have not joined are skipped. Closing early immediately checks outstanding payment methods.
+
+Automatic reminders are personal and sent once per person, kind and deadline. An extension starts a new reminder window. Sending or cancellation stops delivery, and old timers cannot affect a changed deadline or replacement group. Manual reminders remain available.
+
+See [the reminder rules and test steps](docs/improvements/10-automatic-reminders.md). From `frontend`, rerun `npm run test:collection` and `npm run build`; controlled-clock checks avoid waiting through real deadlines.
