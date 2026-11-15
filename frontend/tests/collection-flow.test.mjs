@@ -5,6 +5,7 @@ import {test} from 'node:test';
 import vm from 'node:vm';
 import {transformSync} from 'esbuild';
 import * as data from '../src/data.js';
+import * as retention from '../src/retention.js';
 
 const require=createRequire(import.meta.url);
 const source=transformSync(readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8'),{loader:'jsx',format:'cjs',jsx:'automatic'}).code;
@@ -30,7 +31,7 @@ function app(at='2026-11-16T09:01:00+08:00',options={}){
   }
  };
  const module={exports:{}};
- vm.runInNewContext(source,{module,Date:TestDate,window:browserWindow,navigator,URLSearchParams,setTimeout(fn,delay=0){if(!options.enableTimers)return;const id=++timerSequence;timers.set(id,{id,fn,due:now+Math.max(0,delay)});return id;},clearTimeout(id){timers.delete(id);},require:name=>name==='react'?hooks:name==='./data'?data:name==='./styles.css'?{}:require(name)});
+ vm.runInNewContext(source,{module,Date:TestDate,window:browserWindow,navigator,URLSearchParams,setTimeout(fn,delay=0){if(!options.enableTimers)return;const id=++timerSequence;timers.set(id,{id,fn,due:now+Math.max(0,delay)});return id;},clearTimeout(id){timers.delete(id);},require:name=>name==='react'?hooks:name==='./data'?data:name==='./retention'?retention:name==='./styles.css'?{}:require(name)});
  const render=()=>{
   let tree,passes=0;
   do{
@@ -449,4 +450,31 @@ test('marketing opt-in is explicit, isolated by account and can be withdrawn',()
  switchUser(a,'Calvin');visitInvite(a);assert.equal(a.find(n=>n.type==='input'&&n.props.type==='checkbox').props.checked,false);assert.equal(a.state[6][2].marketingOptIn,false);
  switchUser(a,'Ben');a.click('More');a.find(n=>n.props.className==='card row click'&&a.label(n)==='Privacy and data').props.onClick();assert(a.find(n=>n.type==='input'&&n.props.type==='checkbox').props.checked);
  a.find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:false}});assert.equal(a.state[6][1].marketingOptIn,false);
+});
+
+test('retention expires at seven inactive days and preserves recent unrelated records',()=>{
+ const now=Date.parse('2026-11-16T09:00:00+08:00'),old={id:'old',lastActivityAt:now-retention.RETENTION_MS},recent={id:'recent',lastActivityAt:now-1};
+ assert(retention.expired(old,now));assert(!retention.expired(old,now-1));const kept=retention.pruneInactive([old,recent],now);assert.deepEqual(kept,[recent]);
+});
+test('leaving a reused saved group removes only related membership and retains earlier receipts',()=>{
+ const a=app();a.start();a.aria('Back');a.click('Project Team');a.click('Next: choose pickup');a.choose(5);a.create();
+ const older=a.state[14].find(h=>h.orders[2]),other=a.state[12].find(s=>s.name==='Marketing Team');
+ switchUser(a,'Calvin');visitInvite(a);a.click('Join group');a.click('Group');a.click('Leave group');a.find(n=>n.type==='button'&&n.props.className==='btn'&&n.props.children==='Leave group').props.onClick();
+ assert(!a.state[12].find(s=>s.name==='Project Team').members.includes('Calvin'));assert(a.state[12].find(s=>s.name==='Project Team').members.includes('Eve'));assert(a.state[12].find(s=>s.id===other.id).members.includes('Calvin'));
+ assert(a.state[14].find(h=>h.id===older.id).orders[2]);assert.equal(a.state[6][2].items.length,0);assert.equal(a.state[6][2].pmeth,null);
+});
+test('saved groups can only be renamed by their owner',()=>{
+ const a=basicGroup();joinMember(a,'Ben');switchUser(a,'Ben');a.state[0]='repeat';assert(!a.text().includes('Rename'));assert(!a.text().includes('Project Team'));
+ switchUser(a,'Mary Ng (organiser)');a.state[0]='repeat';assert(a.text().includes('Rename'));
+});
+test('opening history renews activity without extending unrelated records',()=>{
+ const a=app(undefined,{enableTimers:true});a.start();a.state[0]='repeat';const origin=a.now(),target=a.state[14][0].id;
+ a.advanceTo(origin+6*24*60*minute);a.click('Details');a.state[8]=null;a.advanceTo(origin+7*24*60*minute);
+ assert(a.state[14].some(h=>h.id===target));assert.equal(a.state[14].length,1);assert.equal(a.state[12].length,0);
+ a.advanceTo(origin+13*24*60*minute);assert.equal(a.state[14].length,0);
+});
+test('completed live history expires without losing point balance or reusing a charged group id',()=>{
+ const a=timedGroup();a.submit();a.click('Send group order to outlet');a.aria('Switch demo user');a.click('Advance order status (outlet)');a.click('Mark as collected');
+ const paidGroup=a.g().gid,balance=a.state[6][0].pts;a.advanceTo(a.now()+retention.RETENTION_MS);assert(!a.g().live);assert.equal(a.state[6][0].pts,balance);assert.equal(a.state[6][0].items.length,0);
+ a.click('Home');a.click('Start Ya Kun Together');a.click('Next: choose pickup');a.choose(5);a.create();assert.notEqual(a.g().gid,paidGroup);a.submit();a.click('Send group order to outlet');assert(a.g().sent);
 });

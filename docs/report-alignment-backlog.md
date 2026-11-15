@@ -182,13 +182,15 @@ Explain during joining what names, order information and payment status are shar
 
 ### A13 Retention and leaving-group behaviour
 
-**Status** Policy details needed before implementation.
+**Status** Complete. Delivery commit: `Implement seven-day retention and scoped leaving cleanup`.
+
+**Verification** Five retention checks added; all 46 checks and build pass. Expiry, renewal, owner-only renaming, unrelated-record preservation and point-balance preservation are covered.
 
 **Requirement** Section 5.6, Table 5.4, reconciled with FR-10 history and reuse.
 
 Implement the agreed demo retention and deletion rules for order history and saved groups. Explain how the in-memory prototype demonstrates them. Scope deletion to the relevant person's data and preserve unrelated records.
 
-**Decisions needed** Choose a retention duration, define what leaving a group deletes and agree on completed-order history and shared saved groups. The report's reference to deletion on leaving is not specific enough to implement safely.
+**Confirmed policy** Yi Xiang chose seven days of inactivity on 16 November 2026. Leaving removes active order data and related saved membership while preserving earlier receipts until expiry and unrelated records. History activity is per shared record; saved groups are organiser-owned. Listing records does not renew all of them. Refresh reset is separate from expiry.
 
 **Acceptance checks** Once the policy is agreed, test expiry, leaving an active group, viewing a completed order, shared-group ownership and preservation of unrelated users' data. Document refresh reset separately from the retention policy.
 
@@ -228,7 +230,7 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 2. US-04 should name Update my order as the publication step.
 3. The advance-order extension exception needs an explicit statement alongside the two-hour qualification rule.
 4. Extension boundary resolved: one full 15-minute extension per group; no shortening and no extension reaching or passing collection.
-5. Retention duration and leaving-group deletion scope need a policy compatible with history and saved groups.
+5. Retention confirmed: seven inactive days, scoped active/saved-membership cleanup on leaving, earlier receipts retained until expiry.
 6. Invitation interaction confirmed at A10: named invitations followed by participant joining in the same demo tab. A07 documents single rounding after the full bonus calculation as the MVP points convention for group discussion.
 
 ## Delivery routine

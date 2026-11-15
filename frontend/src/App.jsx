@@ -1,6 +1,7 @@
 import {useState,useEffect,useRef} from 'react';
 import {$,sum,tm,MENU,CATEGORIES,SET_DRINKS,itemPrice,repriceItem,OUTLET_CAPS,QUICK_SLOT_COUNT,slotLabel,makeSlotMs,REWARDS,HIST0,SAVED0,USERS0,DEMO_ORDERS,MAXSIZE,SAVED_CARDS,ACCOUNTS} from './data';
 import './styles.css';
+import {RETENTION_MS,expired,pruneInactive,seedSaved,seedHistory} from './retention';
 
 // NOTE: state is local and mocked. Data comes from ./data.js.
 // Open the gear button (top right of the phone) to switch between organiser and participant views and to trigger error states.
@@ -109,9 +110,9 @@ function App(){
  const [cat,setCat]=useState('Sets');
  const [notes,setNotes]=useState([]);
  const [toast,setToast]=useState('');
- const [saved,setSaved]=useState(SAVED0);
+ const [saved,setSaved]=useState(()=>seedSaved(SAVED0,Date.now()));
  const [preset,setPreset]=useState([]);   // names invited from a saved group; empty = brand-new team, organiser adds people later
- const [hist,setHist]=useState(HIST0);
+ const [hist,setHist]=useState(()=>seedHistory(HIST0,Date.now()));
  const [ren,setRen]=useState(null);
  const [err,setErr]=useState('');
  const [open,setOpen]=useState(null);
@@ -124,6 +125,7 @@ function App(){
  const [marketingChoice,setMarketingChoice]=useState(false);
  const nid=useRef(0), toastT=useRef(null), Pr=useRef(null),Gr=useRef(null);
  const collectedGroup=useRef(null),sentGroup=useRef(null);
+ const orderSequence=useRef(0);
  const reminderLedger=useRef(new Set()),viewer=useRef({id:uid,screen:scr});
  viewer.current={id:uid,screen:scr};
 
@@ -231,13 +233,14 @@ function App(){
  const meth=mName(me.pmeth||'card',uid);
  // Order history: the current group appears as soon as it is sent (so it is never lost), older ones are archived below it.
  const snapshot=()=>({s:1,id:g.gid,name:g.name,at:g.sentAt||Date.now(),outlet:outlet.n,slot:g.slot,coll:g.coll,status:g.status||'preparing',pay:g.pay,total:groupTotal,
-  collectionMode:g.collectionMode,advanceQualified:g.advanceQualified,advanceQualifiedAt:g.advanceQualifiedAt,advanceDeadlineAt:g.advanceDeadlineAt,advanceSlotAt:g.advanceSlotAt,
+  lastActivityAt:g.historyLastActivityAt||g.sentAt,collectionMode:g.collectionMode,advanceQualified:g.advanceQualified,advanceQualifiedAt:g.advanceQualifiedAt,advanceDeadlineAt:g.advanceDeadlineAt,advanceSlotAt:g.advanceSlotAt,
   extensionUsed:g.extensionUsed,extensionUntil:g.extensionUntil,advanceExtensionSlotAt:g.advanceExtensionSlotAt,
   pointsRate:8,pointsBonus:bonusPercent,
   payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:orderPoints(groupTotal)}:null,
   members:subm.map(p=>p.n),
   orders:Object.fromEntries(subm.map(p=>[p.id,{items:p.items.map(i=>({...i})),owed:owed(p),paidAmt:p.paidAmt,paidMeth:p.paidMeth,rw:rw(p)?rw(p).t:'',free:freeOf(p)?freeOf(p).free:'',earn:g.status==='collected'?p.earned:earnOf(p)}]))});
- const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist];
+ const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist].filter(h=>h.status!=='collected'||!expired(h,Date.now()));
+ const mySaved=saved.filter(s=>!expired(s,Date.now())&&(s.ownerId===uid||s.members.includes(me.n)));
  const myHist=histAll.filter(h=>h.orders[uid]||(uid===0&&(h.pay==='sponsor'||h.members.includes(USERS0[0].n))));
 
  const say=(t)=>{clearTimeout(toastT.current);setToast({t,mid:true,to:uid});toastT.current=setTimeout(()=>setToast(''),TOAST_MS)};
@@ -334,22 +337,51 @@ function App(){
   setStep(4);say('Group created');
  };
  // A group order that is open or still being collected is never overwritten. A collected one is archived into the order history first.
- const begin=(name,members)=>{
+ const begin=(name,members,sourceSavedId)=>{
   if(g.live&&!g.cancelled&&!(g.sent&&g.status==='collected')){
    say(g.sent?'Your current group order is still in progress':'Finish or cancel your current group order first',1,2000);setScr(g.sent?'done':'group');return;
   }
   const arch=g.live&&g.sent&&!g.cancelled;
   if(arch)setHist(h=>[snapshot(),...h]);
-  const n=hist.filter(h=>h.s).length+(arch?1:0);
-  setG({...freshG(n),...(name?{name}:{}),...(members?{size:Math.min(MAXSIZE,Math.max(2,members.length))}:{})});
+  const n=++orderSequence.current;
+  setG({...freshG(n),sourceSavedId,...(name?{name}:{}),...(members?{size:Math.min(MAXSIZE,Math.max(2,members.length))}:{})});
   setPreset(members||[]);
   setP(p=>p.map(x=>({...blank(USERS0[x.id]),pts:x.pts,hist:x.hist,marketingOptIn:x.marketingOptIn,marketingUpdatedAt:x.marketingUpdatedAt})));
-  setStep(1);setScr('create');
+  setStep(1);setScr('create');return true;
  };
  const startFrom=s=>{
-  begin(s.name,s.members);
+  if(begin(s.name,s.members,s.id)&&s.id)setSaved(groups=>groups.map(x=>x.id===s.id?{...x,lastActivityAt:Date.now()}:x));
  };
  const newOrder=()=>begin();
+ const touchHistory=h=>{
+  if(expired(h,Date.now()))return;
+  if(h.id===g.gid&&g.sent)setG(x=>({...x,historyLastActivityAt:Date.now()}));
+  else setHist(records=>records.map(x=>x.id===h.id?{...x,lastActivityAt:Date.now()}:x));
+ };
+ const runRetention=(now=Date.now())=>{
+  setHist(records=>pruneInactive(records,now));setSaved(groups=>pruneInactive(groups,now));
+  const current=Gr.current;
+  if(current.live&&current.sent&&current.status==='collected'&&expired({lastActivityAt:current.historyLastActivityAt||current.sentAt},now)){
+   setG(freshG(++orderSequence.current));
+   setP(people=>people.map(p=>({...blank(p),hist:p.hist.filter(entry=>entry.at>now-RETENTION_MS)})));
+   setSheet(null);setReceipt(null);setOpen(null);
+  }
+ };
+ useEffect(()=>{
+  const dates=[...hist,...saved].map(record=>record.lastActivityAt+RETENTION_MS);
+  if(g.live&&g.sent&&g.status==='collected')dates.push((g.historyLastActivityAt||g.sentAt)+RETENTION_MS);
+  if(!dates.length)return;
+  const timer=setTimeout(()=>runRetention(),Math.max(0,Math.min(...dates)-Date.now()));
+  return()=>clearTimeout(timer);
+ },[hist,saved,g.inviteKey,g.status,g.historyLastActivityAt,g.sentAt]);
+ const expireSample=()=>{
+  if(!isOrg)return;
+  const old=Date.now()-RETENTION_MS-1,h=hist.find(x=>x.orders[uid]),s=saved.find(x=>x.ownerId===uid);
+  setHist(records=>pruneInactive(records.map(x=>x.id===h?.id?{...x,lastActivityAt:old}:x),Date.now()));
+  setSaved(groups=>pruneInactive(groups.map(x=>x.id===s?.id?{...x,lastActivityAt:old}:x),Date.now()));
+  say(h||s?'Expired one inactive history example and one owned saved group where available. Other records were kept.':'No archived examples are available to expire.');
+ };
+ const clearSavedMembership=p=>setSaved(groups=>groups.map(s=>(s.id===g.sourceSavedId||s.sourceGroupId===g.gid)&&s.members.includes(p.n)?{...s,members:s.members.filter(name=>name!==p.n),lastActivityAt:Date.now()}:s));
  const cancelOrder=()=>{
   if(!isOrg||!pending)return;
   setG(x=>({...x,cancelled:true,closed:true,expired:false}));
@@ -363,11 +395,11 @@ function App(){
  };
  const leave=()=>{
   if(isOrg||!pending||!me.in)return;
-  upd(uid,{...blank(me),in:0,left:1});note(me.n+' left the group','door',[0]);setScr('group');
+  upd(uid,{...blank(me),in:0,left:1});clearSavedMembership(me);note(me.n+' left the group','door',[0]);setScr('group');
  };
  const removeP=p=>{
   if(!isOrg||!pending||p.org||!p.in)return;
-  upd(p.id,{...blank(p),in:0,left:0});
+  upd(p.id,{...blank(p),in:0,left:0});clearSavedMembership(p);
   setG(x=>({...x,invitedIds:x.invitedIds.filter(id=>id!==p.id),removedIds:[...new Set([...x.removedIds,p.id])]}));
   note(p.n+' was removed from the group','alert',[0,p.id]);say(p.n+' removed');
  };
@@ -392,8 +424,10 @@ function App(){
   setG(x=>({...x,closed:true}));note('Ordering closed early by '+org.n,'lock');say('Ordering closed');
  };
  const saveGroup=()=>{
-  if(saved.some(s=>s.name===g.name))return say('Already saved');
-  setSaved(s=>[...s,{name:g.name,members:members.map(x=>x.n)}]);say('Group saved');
+  if(!isOrg||!g.live||g.cancelled)return;
+  const existing=saved.find(s=>s.ownerId===uid&&s.name===g.name);
+  const record={id:existing?.id||'saved-'+g.inviteKey,name:g.name,members:members.map(p=>p.n),ownerId:uid,sourceGroupId:g.gid,lastActivityAt:Date.now()};
+  setSaved(groups=>existing?groups.map(s=>s.id===existing.id?record:s):[...groups,record]);say(existing?'Saved group updated':'Group saved');
  };
  const copyLink=async()=>{
   if(!isOrg||!pending)return;
@@ -482,7 +516,7 @@ function App(){
  const markCollected=()=>{
   if(!isOrg||!g.sent||g.cancelled||g.status!=='ready'||collectedGroup.current===g.gid)return;
   collectedGroup.current=g.gid;
-  setG(x=>({...x,status:'collected'}));
+  setG(x=>({...x,status:'collected',historyLastActivityAt:Date.now()}));
   const ids=earners.map(x=>x.id);
   setP(p=>p.map(x=>{
    if(!ids.includes(x.id))return x;
@@ -579,7 +613,7 @@ function App(){
    {step<4&&<div className="steps">{[1,2,3].map(n=><i key={n} className={n<=step?'on':''}/>)}</div>}
    {step===1&&<>
     <h2 className="ttl">Who is ordering?</h2>
-    {saved.length>0&&<><label className="l">Start from a saved group</label><div className="chips">{saved.map((s,i)=>{const on=preset.join()===s.members.join();return <button key={i} className={'chip '+(on?'on':'')} onClick={()=>{if(on){setPreset([])}else{setPreset(s.members);setG(x=>({...x,name:s.name,size:Math.min(MAXSIZE,Math.max(2,s.members.length))}))}}}>{s.name}</button>})}</div>{preset.length>0&&<div className="mute" style={{marginTop:8}}>Only these people will be invited: {preset.join(', ')}</div>}</>}
+    {mySaved.length>0&&<><label className="l">Start from a saved group</label><div className="chips">{mySaved.map((s,i)=>{const on=preset.join()===s.members.join();return <button key={i} className={'chip '+(on?'on':'')} onClick={()=>{if(on){setPreset([])}else{setPreset(s.members);setG(x=>({...x,name:s.name,sourceSavedId:s.id,size:Math.min(MAXSIZE,Math.max(2,s.members.length))}))}}}>{s.name}</button>})}</div>{preset.length>0&&<div className="mute" style={{marginTop:8}}>Only these people will be invited: {preset.join(', ')}</div>}</>}
     <label className="l">Group name</label><input value={g.name} onChange={e=>setG({...g,name:e.target.value})}/>
     <label className="l">How many people?</label>
     <div className="stepper"><button onClick={()=>setSize(g.size-1)} aria-label="Fewer people">−</button><div><b>{g.size}</b><div className="mute">people, up to {MAXSIZE}</div></div><button onClick={()=>setSize(g.size+1)} aria-label="More people">+</button></div>
@@ -761,7 +795,7 @@ function App(){
 
   {screen==='repeat'&&<>
    <div className="h3" style={{marginTop:0}}>Saved groups</div>
-   {saved.map((s,i)=><div className="card" key={i}><div className="row">{ren===i?<input autoFocus defaultValue={s.name} onBlur={e=>{const v=e.target.value.trim();setSaved(a=>a.map((x,k)=>k===i&&v?{...x,name:v}:x));setRen(null)}}/>:<b className="sp">{s.name}</b>}{ren!==i&&<button className="link" onClick={()=>setRen(i)}>Rename</button>}</div>
+   {mySaved.map((s,i)=><div className="card" key={i}><div className="row">{ren===s.id?<input autoFocus defaultValue={s.name} onBlur={e=>{const v=e.target.value.trim();setSaved(a=>a.map((x,k)=>x.id===s.id&&x.ownerId===uid&&v?{...x,name:v,lastActivityAt:Date.now()}:x));setRen(null)}}/>:<b className="sp">{s.name}</b>}{ren!==s.id&&s.ownerId===uid&&<button className="link" onClick={()=>setRen(s.id)}>Rename</button>}</div>
     <div className="mute">{s.members.join(', ')}</div><button className="btn sm" style={{marginTop:10}} disabled={!isOrg} onClick={()=>startFrom(s)}>Start new order</button></div>)}
    <div className="h3">Previous group orders</div>
    {myHist.length===0&&<div className="card mute">No previous group orders yet. Your team orders will be listed here with the date, time and what you ordered.</div>}
@@ -771,7 +805,7 @@ function App(){
     <div className="mute"><Icon n="pin" s={14}/> {h.outlet} · pickup {h.slot}</div>
     <div className="mute">#{h.id} · {h.members.join(', ')}</div>
     <div className="expand"><b>What everyone ordered</b>{Object.entries(h.orders).map(([k,o])=><div key={k} style={{padding:'6px 0'}}><b>{USERS0[k].n}{+k===uid?' (you)':''}</b>{o.items.map((i,x)=><div className="row" key={x}><span className="sp mute">{itemLine(i)}</span>{(isOrg||+k===uid)&&<span>{$(i.p*i.q)}</span>}</div>)}{o.free&&<div className="mute">Free {o.free} (reward)</div>}</div>)}{!m&&<div className="mute" style={{marginTop:4}}>You didn't submit an order in this group.</div>}</div>
-    <div className="row" style={{marginTop:10}}><button className="btn sm ghost" onClick={()=>setSheet({k:'hist',h})}>Details</button><button className="btn sm" disabled={!isOrg} onClick={()=>startFrom({name:h.name})}>Reuse group</button></div></div>})}
+    <div className="row" style={{marginTop:10}}><button className="btn sm ghost" onClick={()=>{touchHistory(h);setSheet({k:'hist',h})}}>Details</button><button className="btn sm" disabled={!isOrg} onClick={()=>startFrom({name:h.name,members:h.members})}>Reuse group</button></div></div>})}
   </>}
 
   {screen==='wallet'&&<>
@@ -873,7 +907,7 @@ function App(){
    {sheet.k==='cancel'&&<><h2 className="ttl">Cancel this group order?</h2><div className="mute" style={{marginBottom:18}}>Everyone's items are removed and the invite link stops working.</div><button className="btn" onClick={cancelOrder}>Cancel group order</button><button className="btn ghost" style={{marginTop:10}} onClick={()=>setSheet(null)}>Keep order</button></>}
    {sheet.k==='demo'&&<><b style={{fontSize:18}}>Demo controls</b><div className="mute">For presenting the prototype only.</div>
     <label className="l">Viewing as</label><div className="chips">{P.map(p=><button key={p.id} className={'chip '+(uid===p.id?'on':'')} onClick={()=>{setUid(p.id);setMarketingChoice(false);setSheet(null);setToast('');setErr('');setReceipt(null);setSel('card');setPm('me');setOpen(null);if(scr!=='login')setScr('home')}}>{p.n}{p.org?' (organiser)':''}</button>)}</div>
-    <label className="l">Simulate</label>
+    <label className="l">Simulate</label>{isOrg&&<button className="btn ghost sm" style={{width:'100%',marginBottom:8}} onClick={()=>{expireSample();setSheet(null)}}>Expire inactive examples (7 days)</button>}
     {[['Others submit their orders',othersDone],['Deadline passes',()=>{setG(x=>({...x,deadlineAt:Date.now()}));setSheet(null)}],
      [g.sold.length?'Milo is unavailable (tap to restore)':'Milo becomes unavailable',()=>{setG(x=>({...x,sold:x.sold.length?[]:[8]}));note(g.sold.length?'Milo is available again at '+outlet.n:'Milo is now unavailable at '+outlet.n,'alert');setSheet(null)}],
      ['Collection slot fills up',()=>{setG(x=>({...x,slotGone:true}));note(g.slot+' is no longer available','alert');setSheet(null)}],
