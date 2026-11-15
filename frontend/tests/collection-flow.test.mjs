@@ -100,3 +100,47 @@ test('quick and later next-day slots use Singapore dates within the 24-hour hori
  assert(data.slotLabel(times[4],4).includes('17 Nov'));
  assert(times.every(ms=>ms<=base+24*60*minute));
 });
+function noonAdvance(){
+ const a=app('2026-11-16T09:30:00+08:00');a.start();a.click('Advance order');a.choose(5);
+ a.at(Date.parse('2026-11-16T09:40:00+08:00'));a.create();
+ assert.equal(a.g().advanceDeadlineAt,Date.parse('2026-11-16T09:50:00+08:00'));
+ assert.equal(a.g().advanceSlotAt,Date.parse('2026-11-16T12:00:00+08:00'));
+ a.submit();a.click('Group');return a;
+}
+
+test('one full extension preserves the noon advance order at 10.04 and in history',()=>{
+ const a=noonAdvance(),slot=a.g().slot,original=a.g().advanceDeadlineAt;
+ a.click('Extend 15 minutes');assert.equal(a.g().deadlineAt,original+15*minute);
+ assert.equal(a.g().slot,slot);assert(a.g().extensionUsed);assert(a.g().advanceQualified);
+ assert.equal(a.g().advanceDeadlineAt,original);assert(a.button('Extend 15 minutes').props.disabled);
+ a.button('Extend 15 minutes').props.onClick();assert.equal(a.g().deadlineAt,original+15*minute);
+ a.at(Date.parse('2026-11-16T10:04:00+08:00'));a.click('Status');a.click('Close ordering early');a.click('Close ordering');
+ a.click('Send group order to outlet');assert(a.g().sent);assert.equal(a.g().slot,slot);
+ a.click('Group');assert(!a.text().includes('Extend 15 minutes'));
+ a.click('Status');a.aria('Switch demo user');a.click('Advance order status (outlet)');a.click('Mark as collected');a.click('View order history');a.click('Details');
+ assert(a.text().includes('One 15-minute deadline extension used'));a.state[8]=null;a.click('Start new order');
+ const old=a.state[14][0];assert(old.extensionUsed);assert(old.advanceQualified);assert.equal(old.slot,slot);
+ assert(!a.g().extensionUsed);assert.equal(a.g().extensionUntil,0);
+});
+
+test('the advance exception expires, retains capacity checks and resets on a new slot',()=>{
+ const a=noonAdvance();a.click('Extend 15 minutes');a.at(a.g().extensionUntil+1);
+ a.click('Status');assert(a.button('Send group order to outlet').props.disabled);
+ a.at(a.g().extensionUntil);a.state[7]={...a.g(),closed:true};assert(!a.button('Send group order to outlet').props.disabled);
+ const payer=a.state[6][0];a.state[6]=a.state[6].map(p=>p.id===0?{...p,pmeth:null}:p);assert(a.button('Send group order to outlet').props.disabled);
+ a.state[6]=a.state[6].map(p=>p.id===0?payer:p);a.state[7]={...a.g(),sold:[1]};assert(a.button('Send group order to outlet').props.disabled);a.state[7]={...a.g(),sold:[]};
+ a.aria('Switch demo user');a.click('Collection slot fills up');assert(a.button('Send group order to outlet').props.disabled);
+ a.click('Choose new time');const old=a.g().slot;a.select('change-pickup',old);assert(a.g().slotGone);
+ a.select('change-pickup',a.g().slotTimes[4]);assert.equal(a.g().slot,old);
+ a.select('change-pickup',a.g().slotTimes[7]);assert(!a.g().slotGone);assert.equal(a.g().advanceExtensionSlotAt,0);assert(a.g().extensionUsed);
+ a.click('Pickup');assert(!a.g().advanceQualified);assert.equal(a.g().advanceExtensionSlotAt,0);
+});
+
+test('extension permissions and full-duration collection boundary are enforced',()=>{
+ const a=noonAdvance();a.state[6]=a.state[6].map(p=>p.id===1?{...p,in:1}:p);a.aria('Switch demo user');a.click('Ben');a.click('Order');a.click('Group');assert(!a.text().includes('Extend 15 minutes'));
+ a.aria('Switch demo user');a.click('Mary Ng (organiser)');a.click('Order');a.click('Group');
+ const slotAt=a.g().advanceSlotAt;a.at(slotAt-15*minute);assert(a.button('Extend 15 minutes').props.disabled);
+ a.button('Extend 15 minutes').props.onClick();assert(!a.g().extensionUsed);assert.equal(a.g().deadlineAt,a.g().advanceDeadlineAt);
+ a.at(slotAt+1);a.button('Extend 15 minutes').props.onClick();assert(!a.g().extensionUsed);
+ a.at(Date.parse('2026-11-16T09:41:00+08:00'));a.click('Cancel group order');a.find(n=>n.type==='button'&&n.props.className==='btn'&&n.props.children==='Cancel group order').props.onClick();assert(a.g().cancelled);assert(!a.text().includes('Extend 15 minutes'));
+});

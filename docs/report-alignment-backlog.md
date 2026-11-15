@@ -90,7 +90,9 @@ Make pickup versus advance ordering explicit. Keep the agreed quick choices and 
 
 ### A06 Deadline extension exception
 
-**Status** Pending; depends on A05.
+**Status** Complete. Delivery commit: `Allow one extension preserving advance qualification`.
+
+**Verification** Production build and all nine collection checks passed, including the exact noon collection / 9:50am deadline / 10:05am extension example, one-use limit, exception expiry, capacity blocking, replacement qualification, permissions, cancellation, full-duration boundary, history and new-group reset.
 
 **Requirement** US-05 and Yi Xiang's extension decision.
 
@@ -98,7 +100,7 @@ Allow the authorised 15-minute extension while retaining the selected collection
 
 **Acceptance checks** A noon advance collection with an original 9.50am deadline can extend to 10.05am and be sent during that period with its original qualification. The same collection time remains selected. Only the organiser can extend, and cancelled or sent orders cannot reopen through extension.
 
-**Open boundary** Decide how repeated extensions and an extension crossing collection time are handled. The approved two-hour exception does not imply permission to send after collection has passed. Raise this before choosing an implementation for those cases.
+**Confirmed boundary** Yi Xiang selected one extension per group on 16 November 2026. It always adds the full 15 minutes after the later of the existing deadline and current time. If that would reach or pass collection, the organiser must choose a later collection time before extending. The original advance exception applies only through the extended deadline and only to its original collection slot. A replacement must qualify afresh and does not restore the used allowance.
 
 ### A07 Advance-order bonus
 
@@ -211,7 +213,7 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 1. US-10 describes the consolidated breakdown after closing, while the agreed app retains the full view after sending.
 2. US-04 should name Update my order as the publication step.
 3. The advance-order extension exception needs an explicit statement alongside the two-hour qualification rule.
-4. Repeated extensions and collection-time boundary behaviour need a decision.
+4. Extension boundary resolved: one full 15-minute extension per group; no shortening and no extension reaching or passing collection.
 5. Retention duration and leaving-group deletion scope need a policy compatible with history and saved groups.
 6. Confirm the demo invitation interaction and the points rounding convention when those items are reached.
 
@@ -219,4 +221,4 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 
 For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-The next implementation item is A06, deadline extension exception. Unresolved policy details remain recorded above for discussion.
+The next implementation item is A07, advance-order bonus. Unresolved policy details remain recorded above for discussion.

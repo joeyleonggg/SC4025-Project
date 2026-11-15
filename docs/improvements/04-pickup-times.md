@@ -19,7 +19,7 @@ The outlet receives an order when the organiser sends it. Ordinary pickup theref
 
 Creation and replacement choices anticipate sending at the later of the current time and the ordering deadline. Creation checks again after the organiser chooses the ordering window. Sending rechecks the current lead time and capacity, as well as the existing stock and payment checks. A stale time or a full slot requires a valid replacement.
 
-For advance orders, creation saves the qualification time, original planned deadline and collection timestamp. A replacement validates and records fresh qualification. Switching to pickup clears those fields. These records support A06's approved deadline-extension exception; A05 alone still applies the normal send-time check. The extension exception and 10% bonus remain separate work items A06 and A07.
+For advance orders, creation saves the qualification time, original planned deadline and collection timestamp. A replacement validates and records fresh qualification. Switching to pickup clears those fields. A06 now uses these records to preserve the original advance qualification during the one approved 15-minute extension. See [the extension rules](05-deadline-extension.md). The 10% bonus remains pending A07.
 
 Only the organiser can change collection choices before sending. Sent and cancelled groups cannot change mode or time. Existing history retains its original values.
 
@@ -56,4 +56,4 @@ npm run build
 7. Submit an order, confirm its payment method, close ordering and send. Confirm the collection time is locked and the edit control is gone.
 8. Mark the order collected and inspect history. Confirm the mode, Singapore date and time match.
 
-The special extension behaviour will be tested and documented in A06.
+The special extension behaviour is tested and documented in [Improvement 05](05-deadline-extension.md).

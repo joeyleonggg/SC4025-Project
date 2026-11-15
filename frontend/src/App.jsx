@@ -83,7 +83,7 @@ const lines = p => p.items.map(itemLine).concat(freeOf(p) ? [freeTxt(p)] : []).j
 const waitText = p => p.items.length ? 'Still choosing' : 'Not ordered yet';
 const blank = p => ({...p,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:null,payFail:0,rw:null,earned:0,left:0,in:p.org?1:0});
 const submitted = p => p.sub ? {...p,...p.sub} : p;
-const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[],collectionMode:'pickup',advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0};
+const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[],collectionMode:'pickup',advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0,extensionUsed:false,extensionUntil:0,advanceExtensionSlotAt:0};
 // n = how many group orders this session has already finished, so every new group gets its own order id and collection number.
 const slotSet = (win=10) => {
  const now=Date.now(),ms=makeSlotMs(now);
@@ -126,9 +126,13 @@ function App(){
  const slotFits=t=>outlet.slots[t]>=g.size&&!(g.slotGone&&t===g.slot);
  const leadMinutes=g.collectionMode==='advance'?120:15;
  const collectionName=g.collectionMode==='advance'?'Advance order':'Pickup';
+ // Only the original advance slot gets the approved extension exception.
+ const advanceExtensionApplies=(t,now)=>g.collectionMode==='advance'&&g.extensionUsed&&g.advanceQualified&&
+  now<=g.extensionUntil&&g.advanceExtensionSlotAt===timeOfSlot(t)&&g.advanceSlotAt===timeOfSlot(t)&&
+  g.advanceSlotAt>=g.advanceDeadlineAt+120*60000&&timeOfSlot(t)>now;
  const slotAvailable=(t,now,planned=false)=>{
   const reference=planned?Math.max(now,g.live?g.deadlineAt:now+g.win*60000):now;
-  return slotFits(t)&&timeOfSlot(t)>=reference+leadMinutes*60000;
+  return slotFits(t)&&(advanceExtensionApplies(t,now)||timeOfSlot(t)>=reference+leadMinutes*60000);
  };
  Pr.current=P;
  const members=P.filter(p=>p.in).map(submitted), subm=members.filter(p=>p.sub);
@@ -193,6 +197,7 @@ function App(){
  // Order history: the current group appears as soon as it is sent (so it is never lost), older ones are archived below it.
  const snapshot=()=>({s:1,id:g.gid,name:g.name,at:g.sentAt||Date.now(),outlet:outlet.n,slot:g.slot,coll:g.coll,status:g.status||'preparing',pay:g.pay,total:groupTotal,
   collectionMode:g.collectionMode,advanceQualified:g.advanceQualified,advanceQualifiedAt:g.advanceQualifiedAt,advanceDeadlineAt:g.advanceDeadlineAt,advanceSlotAt:g.advanceSlotAt,
+  extensionUsed:g.extensionUsed,extensionUntil:g.extensionUntil,advanceExtensionSlotAt:g.advanceExtensionSlotAt,
   pointsRate:8,
   payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:pointsFor(groupTotal)}:null,
   members:subm.map(p=>p.n),
@@ -225,18 +230,19 @@ function App(){
  const setSize=n=>{const min=Math.max(2,preset.length);if(n>MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`);n=MAXSIZE}if(n<min&&preset.length>2)say(`${preset.length} people are in this saved group`);setG(x=>({...x,size:Math.max(min,n)}))};
  const setOutlet=i=>{
   if(!isOrg||g.sent||g.cancelled)return;
-  setG(x=>{const idx=x.slotTimes.indexOf(x.slot),ok=idx>=0&&(OUTLET_CAPS[i].caps[idx]??OUTLET_CAPS[i].laterCap)>=x.size;return {...x,oi:i,slot:ok?x.slot:'',...(ok?{}:{advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0})}});
+  setG(x=>{const idx=x.slotTimes.indexOf(x.slot),ok=idx>=0&&(OUTLET_CAPS[i].caps[idx]??OUTLET_CAPS[i].laterCap)>=x.size;return {...x,oi:i,slot:ok?x.slot:'',...(ok?{}:{advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0,advanceExtensionSlotAt:0})}});
  };
  const setCollectionMode=mode=>{
   if(!isOrg||g.sent||g.cancelled||mode===g.collectionMode)return;
-  setG(x=>({...x,collectionMode:mode,...slotSet(x.win),slot:'',slotGone:false,advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0}));
+  setG(x=>({...x,collectionMode:mode,...slotSet(x.win),slot:'',slotGone:false,advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0,advanceExtensionSlotAt:0}));
  };
  const collectionModes=<><label className="l">Collection option</label><div className="chips">{[['pickup','Pickup'],['advance','Advance order']].map(([mode,label])=><button key={mode} className={'chip '+(g.collectionMode===mode?'on':'')} onClick={()=>setCollectionMode(mode)}>{label}</button>)}</div><div className="mute" style={{marginTop:8}}>{g.collectionMode==='advance'?'Choose collection at least two hours after the planned ordering deadline.':'Allow at least 15 minutes after sending for preparation. ASAP includes the ordering window.'}</div></>;
  const chooseSlot=t=>{
   const now=Date.now();
   if(!isOrg||g.sent||g.cancelled||!slotAvailable(t,now,true))return;
+  if(t===g.slot)return;
   const qualified=g.live&&g.collectionMode==='advance';
-  setG(x=>({...x,slot:t,slotGone:false,advanceQualified:qualified,advanceQualifiedAt:qualified?now:0,advanceDeadlineAt:qualified?Math.max(now,g.deadlineAt):0,advanceSlotAt:qualified?timeOfSlot(t):0}));
+  setG(x=>({...x,slot:t,slotGone:false,advanceExtensionSlotAt:0,advanceQualified:qualified,advanceQualifiedAt:qualified?now:0,advanceDeadlineAt:qualified?Math.max(now,g.deadlineAt):0,advanceSlotAt:qualified?timeOfSlot(t):0}));
   if(g.live)note(collectionName+' time changed to '+t,'clock');
  };
 
@@ -303,13 +309,16 @@ function App(){
   upd(p.id,{in:1,left:0});note(p.n+' was added to '+g.name,'users',[...mem(),p.id]);
   if(members.length+1>=g.size)say(p.n+' added. Group is now full ('+(members.length+1)+'/'+g.size+')'+(g.size>=MAXSIZE?', the maximum':''),1);else say(p.n+' added to the group');
  };
- const extensionLimit=slotAt-60000;
+ const canExtend=now=>isOrg&&pending&&!g.extensionUsed&&Math.max(g.deadlineAt,now)+15*60000<slotAt;
  const extend=()=>{
   if(!isOrg||!pending)return;
-  const cap=extensionLimit, base=Math.max(g.deadlineAt,Date.now());
-  if(base>=cap){say('Choose a later pickup time before extending');return}
-  const at=Math.min(base+15*60000,cap);
-  setG(x=>({...x,deadlineAt:at,deadline:tm(at),closed:false,expired:false,reminded:false}));note('Deadline extended to '+tm(at),'clock');say('Deadline extended to '+tm(at));setSheet(null);
+  if(g.extensionUsed)return say('The one 15-minute extension has already been used');
+  const now=Date.now(),at=Math.max(g.deadlineAt,now)+15*60000;
+  if(at>=slotAt)return say('Choose a later collection time for the full 15-minute extension');
+  const keepsAdvance=g.collectionMode==='advance'&&g.advanceQualified&&g.advanceSlotAt===slotAt&&slotAt>=g.advanceDeadlineAt+120*60000;
+  setG(x=>({...x,deadlineAt:at,deadline:tm(at),closed:false,expired:false,reminded:false,extensionUsed:true,extensionUntil:at,advanceExtensionSlotAt:keepsAdvance?slotAt:0}));
+  note('Deadline extended once by 15 minutes to '+tm(at)+'. Collection stays at '+g.slot+(keepsAdvance?'. Original advance qualification is retained during this extension.':'.'),'clock');
+  say('Deadline extended to '+tm(at));setSheet(null);
  };
  const closeEarly=()=>{
   if(!isOrg||!orderingOpen())return;
@@ -447,7 +456,7 @@ function App(){
  const T={gate:'Order',home:'Ya Kun Together',create:'New group order',group:'Order',menu:'Order',cart:'Order',track:'Order',done:'Order',pay:'Payment',paid:'Payment confirmed',wallet:'Pay',rewards:'Rewards',more:'More',repeat:'Saved and previous',notifs:'Notifications',join:'Group invitation'};
  const back={join:'home',create:'home',pay:'wallet',paid:'track',repeat:'more',notifs:'more'};
  const goBack=()=>{if(screen==='create'&&step>1&&step<4)setStep(step-1);else setScr(back[screen])};
- const expiredBtns=<div className="col"><button className="btn" onClick={extend}>Add 15 more minutes</button><button className="btn ghost" disabled={subm.length===0} onClick={()=>{setSheet(null);setG(x=>({...x,expired:false}));setScr('track')}}>Continue with {subm.length} order{subm.length===1?'':'s'}</button><button className="link danger" onClick={()=>setSheet({k:'cancel'})}>Cancel group order</button></div>;
+ const expiredBtns=<div className="col"><button className="btn" disabled={!canExtend(Date.now())} onClick={extend}>Add 15 more minutes</button><button className="btn ghost" disabled={subm.length===0} onClick={()=>{setSheet(null);setG(x=>({...x,expired:false}));setScr('track')}}>Continue with {subm.length} order{subm.length===1?'':'s'}</button><button className="link danger" onClick={()=>setSheet({k:'cancel'})}>Cancel group order</button></div>;
  const pstat=p=>g.pay==='sponsor'?<Tag c="ok">Organiser pays</Tag>:g.sent&&p.sub&&p.paid?<Tag c="ok">Paid</Tag>:p.payFail&&!g.sent?<Tag c="w">Payment declined</Tag>:!p.sub?<Tag>–</Tag>:owed(p)===0?<Tag c="ok">Nothing to pay</Tag>:p.pmeth?<Tag c="ok">Payment ready</Tag>:<Tag c="w">Payment method needed</Tag>;
 
  if(scr==='login')return <div className="phone"><div className="splash">
@@ -472,6 +481,7 @@ function App(){
   {tab==='order'&&<div className="seg">{[['menu','Menu'],['cart','My order'],['group','Group'],['track','Status']].map(([k,l])=><button key={k} className={(scr===k||(k==='track'&&scr==='done'))?'on':''} onClick={()=>setScr(k==='track'&&g.sent?'done':k)}>{l}{k==='cart'&&me.items.length>0&&<i className="badge">{me.items.length}</i>}</button>)}</div>}
   {tab==='order'&&g.live&&g.cancelled&&<Ban c="e">This group order was cancelled. {isOrg&&<button className="link" onClick={newOrder}>Start a new order</button>}</Ban>}
   {tab==='order'&&g.live&&!g.sent&&!g.cancelled&&<TimerBar deadlineAt={g.deadlineAt} closed={g.closed}/>}
+  {tab==='order'&&pending&&g.extensionUsed&&<Ban>One 15-minute extension used. Collection stays at {g.slot}.{advanceExtensionApplies(g.slot,Date.now())&&' Original advance qualification is retained until '+tm(g.extensionUntil)+'.'}</Ban>}
   {tab==='order'&&isOrg&&g.expired&&!g.sent&&!g.cancelled&&<div className="card"><b>Time is up</b><div className="mute" style={{margin:'6px 0 14px'}}>{subm.length} of {members.length} people submitted.</div>{expiredBtns}</div>}
 
   {screen==='home'&&<>
@@ -559,7 +569,7 @@ function App(){
     {full&&<Ban>{g.size>=MAXSIZE?`Group is full (maximum ${MAXSIZE} people).`:`Group is full (${members.length}/${g.size}).`} {g.size<MAXSIZE&&<button className="link" onClick={()=>setSheet({k:'slot'})}>Raise group size</button>}</Ban>}
     {outside.map(p=><div className="card row" key={p.id}><div className="av">{p.n[0]}</div><div className="sp"><b>{p.n}</b>{p.left?<div className="mute">Left this group</div>:null}</div>
      <button className="btn sm" disabled={full} aria-label={'Add '+p.n} onClick={()=>addP(p)}>Add</button></div>)}</>})()}
-   {isOrg&&pending&&<div className="row" style={{marginTop:6}}><button className="btn ghost sm pair" disabled={Math.max(g.deadlineAt,Date.now())>=extensionLimit} onClick={extend}>Extend 15 minutes</button><button className="btn sm pair" disabled={g.closed} onClick={()=>setSheet({k:'confirm',title:'Close ordering now?',msg:"Nobody will be able to submit or change an order after this, even if the deadline hasn't passed.",label:'Close ordering',action:()=>{closeEarly();setSheet(null)}})}>Close ordering</button></div>}
+   {isOrg&&pending&&<div className="row" style={{marginTop:6}}><button className="btn ghost sm pair" disabled={!canExtend(Date.now())} onClick={extend}>Extend 15 minutes</button><button className="btn sm pair" disabled={g.closed} onClick={()=>setSheet({k:'confirm',title:'Close ordering now?',msg:"Nobody will be able to submit or change an order after this, even if the deadline hasn't passed.",label:'Close ordering',action:()=>{closeEarly();setSheet(null)}})}>Close ordering</button></div>}
    {isOrg&&!g.sent&&!g.cancelled&&<button className="btn ghost" style={{marginTop:12}} onClick={()=>setSheet({k:'slot'})}>Change pickup time or group size</button>}
    {isOrg&&<button className="btn ghost" style={{marginTop:12}} onClick={saveGroup}>Save this group</button>}
    {isOrg&&!g.sent&&!g.cancelled&&<button className="link danger" style={{marginTop:16}} onClick={()=>setSheet({k:'cancel'})}>Cancel group order</button>}
@@ -733,13 +743,14 @@ function App(){
     <label className="l">Collection time</label>
     <PickupChoices times={g.slotTimes} selected={g.slot} mode={g.collectionMode} available={t=>slotAvailable(t,Date.now(),true)} onPick={chooseSlot} id="change-pickup"/>
     {!slotAvailable(g.slot,Date.now(),true)&&<Ban c="e"><span style={{display:'block',marginTop:14}}>Pick an available future time that fits {g.size} people.</span></Ban>}
-    {!g.slotTimes.some(t=>slotAvailable(t,Date.now(),true))&&<button className="btn ghost sm" onClick={()=>setG(x=>({...x,...slotSet(x.win),slot:'',slotGone:false,advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0}))}>Show new pickup times</button>}
+    {!g.slotTimes.some(t=>slotAvailable(t,Date.now(),true))&&<button className="btn ghost sm" onClick={()=>setG(x=>({...x,...slotSet(x.win),slot:'',slotGone:false,advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0,advanceExtensionSlotAt:0}))}>Show new pickup times</button>}
     <button className="btn" style={{marginTop:22}} onClick={()=>setSheet(null)}>Done</button></>}
    {sheet.k==='hist'&&(()=>{const h=sheet.h,m=h.orders[uid],sponsor=h.pay==='sponsor',payer=sponsor&&isOrg;return <><b style={{fontSize:18}}>{h.name}</b>
     <div className="mute">#{h.id} · {fdt(h.at)}</div>
     {h.collectionMode&&<div className="mute">{h.collectionMode==='advance'?'Advance order':'Pickup'}</div>}
     <div className="mute">{h.outlet} · pickup {h.slot}{h.coll?' · collection '+h.coll:''}</div>
     <div className="mute">{STAT[h.status]} · {h.pay==='sponsor'?'Organiser paid for everyone':'Everyone paid for their own order'}</div>
+    {h.extensionUsed&&<div className="mute">One 15-minute deadline extension used; collection time unchanged.</div>}
     {h.pointsRate!=null&&<div className="mute">{h.pointsRate} Cherish points per $1 paid</div>}
     {h.multiplier!=null&&<div className="mute">{h.multiplier.toFixed(1)}× group points multiplier</div>}
     <div className="h3">Your order</div>

@@ -62,6 +62,12 @@ Choose **Pickup** for ASAP, three quick times and the later-time dropdown, or **
 
 Pickup requires at least 15 minutes from sending; advance orders normally require at least two hours. The app validates creation, replacement and sending against the timing and mock capacity rules. Next-day choices show Singapore dates, and sending locks the mode, outlet and collection time. History retains the chosen mode and time.
 
-The agreed deadline-extension exception is pending A06, and the advance-order points bonus is pending A07. Outlet opening hours are not modelled. The scheduling horizon remains 24 hours.
+One 15-minute extension per group preserves original advance qualification through the extended deadline, without changing collection time. The advance-order points bonus is pending A07. Outlet opening hours are not modelled. The scheduling horizon remains 24 hours.
 
 See [collection rules and manual test steps](docs/improvements/04-pickup-times.md). From `frontend`, rerun the automated collection checks with `npm run test:collection` and build with `npm run build`.
+
+## Deadline extension
+
+Mary can extend once per group by a full 15 minutes. Collection stays unchanged. Originally qualifying advance orders can still be sent during the extension even after crossing the normal two-hour boundary. Changing the collection time requires fresh qualification, and an extension cannot reach or pass collection.
+
+See [the extension rules, noon example and test steps](docs/improvements/05-deadline-extension.md). Automated checks run with `npm run test:collection` from `frontend`.
