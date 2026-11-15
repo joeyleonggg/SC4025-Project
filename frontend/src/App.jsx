@@ -708,7 +708,7 @@ function App(){
     <div className="mute" style={{margin:'6px 0 4px'}}>A smaller group can open up more pickup times.</div>
     <div className="mute">Choose a quick pickup or use the dropdown for a later time, up to 24 hours ahead.</div>
     <label className="l">Group size</label>
-    <div className="stepper"><button onClick={()=>setG(x=>({...x,size:Math.max(members.length,x.size-1)}))} aria-label="Fewer people">−</button><div><b>{g.size}</b><div className="mute">people</div></div><button onClick={()=>setG(x=>{if(x.size>=MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`,1,1500);return x}return {...x,size:x.size+1}})} aria-label="More people">+</button></div>
+    <div className="stepper"><button disabled={g.size<=Math.max(2,members.length)} onClick={()=>setG(x=>({...x,size:Math.max(2,members.length,x.size-1)}))} aria-label="Fewer people">−</button><div><b>{g.size}</b><div className="mute">people</div></div><button disabled={g.size>=MAXSIZE} onClick={()=>setG(x=>{if(x.size>=MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`,1,1500);return x}return {...x,size:x.size+1}})} aria-label="More people">+</button></div>
     <label className="l">Pickup time</label>
     <PickupChoices times={g.slotTimes} selected={g.slot} available={t=>slotAvailable(t,Date.now())} onPick={chooseSlot} id="change-pickup"/>
     {!slotAvailable(g.slot,Date.now())&&<Ban c="e"><span style={{display:'block',marginTop:14}}>Pick an available future time that fits {g.size} people.</span></Ban>}
