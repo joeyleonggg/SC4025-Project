@@ -12,7 +12,7 @@ await mkdir(root,{recursive:true});
 for(const [name,value]of Object.entries(files)){
  const text=JSON.stringify(value,null,2)+'\n',path=new URL(name,root);
  if(process.argv.includes('--check')){
-  if(await readFile(path,'utf8')!==text)throw new Error(name+' differs from frontend/src/data.js; run npm run export:mock');
+  if((await readFile(path,'utf8')).replace(/\r\n/g,'\n')!==text)throw new Error(name+' differs from frontend/src/data.js; run npm run export:mock');
  }else await writeFile(path,text);
 }
 console.log(process.argv.includes('--check')?'Mock-data snapshots match the application.':'Exported mock-data snapshots to '+fileURLToPath(root));

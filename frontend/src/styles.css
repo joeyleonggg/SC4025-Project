@@ -218,3 +218,6 @@ button:not(:disabled){cursor:pointer}
 /* tidy label / value info card */
 .kv{display:grid;grid-template-columns:96px 1fr;gap:8px 12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:14px;line-height:1.4}
 .kv span{color:var(--mute)}.kv b{font-weight:700;word-break:break-word}
+
+/* Brief feedback must not intercept the user's next action. */
+.toast{pointer-events:none}

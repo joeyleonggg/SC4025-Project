@@ -244,5 +244,5 @@ const O2 = {
  2: ho([it(3,'Peanut Butter Toast Set','Teh O, kosong',1,5.2)]),
  3: ho([it(1,'Kaya Toast Set','Kopi',2,5.2)])};
 export const HIST0 = [
- {id:'YT0987',name:'Friday Breakfast Crew',at:new Date(2026,8,18,8,20).getTime(),outlet:'Ya Kun – Far East Square',slot:'8:45 AM',coll:'C-017',status:'collected',pay:'individual',members:['Mary Ng','Ben','Dylan'],orders:O1,total:tot(O1)},
- {id:'YT0951',name:'Marketing Team',at:new Date(2026,8,8,8,35).getTime(),outlet:'Ya Kun – NTU North Spine',slot:'9:00 AM',coll:'C-029',status:'collected',pay:'individual',members:['Mary Ng','Ben','Calvin','Dylan'],orders:O2,total:tot(O2)}];
+ {id:'YT0987',name:'Friday Breakfast Crew',at:new Date('2026-09-18T08:20:00+08:00').getTime(),outlet:'Ya Kun – Far East Square',slot:'8:45 AM',coll:'C-017',status:'collected',pay:'individual',members:['Mary Ng','Ben','Dylan'],orders:O1,total:tot(O1)},
+ {id:'YT0951',name:'Marketing Team',at:new Date('2026-09-08T08:35:00+08:00').getTime(),outlet:'Ya Kun – NTU North Spine',slot:'9:00 AM',coll:'C-029',status:'collected',pay:'individual',members:['Mary Ng','Ben','Calvin','Dylan'],orders:O2,total:tot(O2)}];

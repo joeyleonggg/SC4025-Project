@@ -220,7 +220,9 @@ Run one organiser and at least two participants through creation, invitation, cu
 
 ### A16 Wireframes and full demonstration
 
-**Status** In progress: capturing the tested screens, captions and demonstration video.
+**Status** Complete. Delivery commit: `Add final report captures and captioned demonstration`.
+
+**Verification** 27 actual application captures, report-ready figure overview/captions, presenter notes and a 3m36s silent captioned MP4 supplied. This is a screen-capture sequence, not continuous pointer/narration recording. Modal animation captures were corrected during visual QA. H.264 1280×720 output decodes successfully; local documentation links resolve.
 
 **Requirement** Assigned Section 4.5 and presentation video work.
 
@@ -239,6 +241,6 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 
 ## Delivery routine
 
-For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
+For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. Commit and push each reviewed item with a descriptive message. Yi Xiang later authorised completing and pushing all remaining items together with consolidated testing instructions. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-Functional implementation and report acceptance are complete. A16 media capture and the final documentation-link check are in progress. Agreed report wording differences remain recorded above.
+A01–A16 are delivered. All 50 automated checks, production build, mock-data consistency and documentation-link checks pass. Final media and the consolidated manual testing guide are supplied. User manual acceptance and the repository owner's merge/publication remain handoff actions. Agreed report wording differences remain recorded above.
