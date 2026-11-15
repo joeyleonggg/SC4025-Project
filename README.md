@@ -45,3 +45,13 @@ Everyone pays for their own submitted items using their selected mock card. Choo
 The latest report (FR-05, Table 4.3 and Section 4.4) supersedes the earlier decision to offer organiser sponsorship. New groups, including those created from saved groups, use individual payments. Older sponsored receipts remain readable.
 
 See [the payment decision and test steps](docs/improvements/01-payment-choice.md).
+
+## Loyalty points
+
+Each person earns 8 Cherish points per $1 actually paid after their personal reward discount, rounded down to whole points. A $6.30 payment earns 50 points; a $4.30 payment earns 34 points. Group membership and capacity do not change the award.
+
+Points are credited only when the organiser marks the order collected. New receipts record the baseline rate and earned points. Older recorded awards and group multipliers remain intact in history.
+
+This follows FR-06 and US-08 in the latest report and supersedes the earlier group-size multiplier. The separate advance-order bonus is pending A07.
+
+See [the points calculation and test steps](docs/improvements/02-group-points.md).

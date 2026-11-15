@@ -5,7 +5,7 @@ import './styles.css';
 // NOTE: state is local and mocked. Data comes from ./data.js.
 // Open the gear button (top right of the phone) to switch between organiser and participant views and to trigger error states.
 
-const pointsFor = (v,memberCount=1) => Math.floor(Math.round(v*100)*8*(10+Math.max(0,memberCount-1))/1000);
+const pointsFor = v => Math.floor(Math.round(v*100)*8/100);
 const TOAST_MS = 1000;   // every pop-up message disappears after 1 second
 // Payment methods a person can pick. Picking one does NOT charge anything; the charge happens when the organiser sends the order.
 const METHODS = ['card'];   // Ya Kun only supports its card payment
@@ -122,9 +122,7 @@ function App(){
  const slotAvailable=(t,now)=>slotFits(t)&&timeOfSlot(t)>Math.max(now,g.deadlineAt);
  Pr.current=P;
  const members=P.filter(p=>p.in).map(submitted), subm=members.filter(p=>p.sub);
- const groupMultiplier=(10+Math.max(0,members.length-1))/10;
- const groupPoints=v=>pointsFor(v,members.length);
- const pointsInfo=groupMultiplier.toFixed(1)+'× points for '+members.length+' group member'+(members.length===1?'':'s')+' · base rate 8 points per $1';
+ const pointsInfo='8 Cherish points per $1 paid after rewards, rounded down to whole points';
  const rw=p=>REWARDS.find(r=>r.id===p.rw);
  // Points are only spent when the group order is sent (see `send`), so every screen shows the real balance until then.
  const avail=me.pts;
@@ -132,7 +130,7 @@ function App(){
  const groupTotal=subm.reduce((s,p)=>s+owed(p),0);
  // Points follow the money: when everyone pays for their own, each person earns on their own items.
  // When the organiser pays for everyone, only the organiser earns points (on the whole group total).
- const earnOf=p=>g.pay==='sponsor'?(p.org?groupPoints(groupTotal):0):groupPoints(owed(p));
+ const earnOf=p=>g.pay==='sponsor'?(p.org?pointsFor(groupTotal):0):pointsFor(owed(p));
  const earners=g.pay==='sponsor'?members.filter(p=>p.org):subm;
  const declined=!!me.payFail&&!g.sent;
  // Nobody is charged until the order is sent. "Ready to pay" just means a payment method has been chosen.
@@ -166,7 +164,7 @@ function App(){
   <span>Outlet</span><b>{outlet.n}</b>
   <span>Collection</span><b>{g.slot}{g.sent&&' (locked)'}</b>
   <span>Payment</span><b>{g.pay==='sponsor'?org.n+' pays for everyone':'Everyone pays for their own order'}</b>
-  <span>Points multiplier</span><b>{groupMultiplier.toFixed(1)}× · {members.length} member{members.length===1?'':'s'}</b>
+  <span>Points rate</span><b>8 points per $1 paid</b>
  </div>;
  const statusText=g.cancelled?'Cancelled':g.sent?(g.status==='collected'?'Collected':g.status==='ready'?'Ready for collection':'Being prepared'):g.closed?'Ordering closed':'Ordering open';
  const invState=g.sent||g.cancelled||g.inv==='expired'?'expired':(g.inv==='full'||members.length>=g.size)?'full':'valid';
@@ -183,8 +181,8 @@ function App(){
  const meth=mName(me.pmeth||'card',uid);
  // Order history: the current group appears as soon as it is sent (so it is never lost), older ones are archived below it.
  const snapshot=()=>({s:1,id:g.gid,name:g.name,at:g.sentAt||Date.now(),outlet:outlet.n,slot:g.slot,coll:g.coll,status:g.status||'preparing',pay:g.pay,total:groupTotal,
-  multiplier:groupMultiplier,
-  payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:groupPoints(groupTotal)}:null,
+  pointsRate:8,
+  payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:pointsFor(groupTotal)}:null,
   members:subm.map(p=>p.n),
   orders:Object.fromEntries(subm.map(p=>[p.id,{items:p.items.map(i=>({...i})),owed:owed(p),rw:rw(p)?rw(p).t:'',free:freeOf(p)?freeOf(p).free:'',earn:g.status==='collected'?p.earned:earnOf(p)}]))});
  const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist];
@@ -573,8 +571,8 @@ function App(){
      {freeOf(cart)&&<div className="row"><span className="sp">Free {freeOf(cart).free} (reward)</span>{$(0)}</div>}
      {rw(cart)&&sum(cart.items)-owed(cart)>0&&<div className="row voucher"><span className="sp">{rw(cart).t}</span>− {$(sum(cart.items)-owed(cart))}</div>}
      <div className="row" style={{marginTop:6}}><b className="sp">{g.pay==='sponsor'&&!isOrg?org.n+' is paying for you':'You pay'}</b><b>{g.pay==='sponsor'&&!isOrg?$(0):$(owed(cart))}</b></div>
-     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':g.pay==='sponsor'?<>You'll earn about <b>{groupPoints(groupTotal-(me.sub?owed(me):0)+owed(cart))} Cherish points</b>.</>:<>You'll earn about <b>{earnOf(cart)} Cherish points</b> when the group order is collected.</>}</div>
-     <div className="mute" style={{marginTop:6}}>{pointsInfo}. The multiplier is fixed when the group order is sent.</div></div>
+     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':g.pay==='sponsor'?<>You'll earn about <b>{pointsFor(groupTotal-(me.sub?owed(me):0)+owed(cart))} Cherish points</b>.</>:<>You'll earn about <b>{earnOf(cart)} Cherish points</b> when the group order is collected.</>}</div>
+     <div className="mute" style={{marginTop:6}}>{pointsInfo}.</div></div>
    </>}
     {!!me.sub&&g.pay==='individual'&&owed(me)>0&&!g.sent&&(me.pmeth?<><Ban c="k">Payment method: {mName(me.pmeth,uid)}. You will be charged {$(owed(me))} only when {isOrg?'you send':'the organiser sends'} the group order.</Ban><button className="link" onClick={()=>goPay('me')}>Change payment method</button></>:<button className="btn" style={{marginTop:10}} onClick={()=>goPay('me')}>Choose payment method</button>)}
     {g.sent&&!!me.paid&&me.paidAmt>0&&<Ban c="k">Charged {$(me.paidAmt)} to {me.paidMeth}</Ban>}
@@ -717,6 +715,7 @@ function App(){
     <div className="mute">#{h.id} · {fdt(h.at)}</div>
     <div className="mute">{h.outlet} · pickup {h.slot}{h.coll?' · collection '+h.coll:''}</div>
     <div className="mute">{STAT[h.status]} · {h.pay==='sponsor'?'Organiser paid for everyone':'Everyone paid for their own order'}</div>
+    {h.pointsRate!=null&&<div className="mute">{h.pointsRate} Cherish points per $1 paid</div>}
     {h.multiplier!=null&&<div className="mute">{h.multiplier.toFixed(1)}× group points multiplier</div>}
     <div className="h3">Your order</div>
     {m?<>{m.items.map((i,k)=><div className="row" key={k} style={{padding:'4px 0'}}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}{i.q>1&&<div className="mute">× {i.q}</div>}</span>{$(i.p*i.q)}</div>)}{m.free&&<div className="row" style={{padding:'4px 0'}}><span className="sp">{m.free}<div className="mute">Free reward</div></span>{$(0)}</div>}
