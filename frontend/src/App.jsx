@@ -5,7 +5,7 @@ import './styles.css';
 // NOTE: state is local and mocked. Data comes from ./data.js.
 // Open the gear button (top right of the phone) to switch between organiser and participant views and to trigger error states.
 
-const pointsFor = v => Math.floor(Math.round(v*100)*8/100);
+const pointsFor = (v,bonusPercent=0) => Math.floor(Math.round(v*100)*8*(100+bonusPercent)/10000);
 const TOAST_MS = 1000;   // every pop-up message disappears after 1 second
 // Payment methods a person can pick. Picking one does NOT charge anything; the charge happens when the organiser sends the order.
 const METHODS = ['card'];   // Ya Kun only supports its card payment
@@ -83,7 +83,7 @@ const lines = p => p.items.map(itemLine).concat(freeOf(p) ? [freeTxt(p)] : []).j
 const waitText = p => p.items.length ? 'Still choosing' : 'Not ordered yet';
 const blank = p => ({...p,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:null,payFail:0,rw:null,earned:0,left:0,in:p.org?1:0});
 const submitted = p => p.sub ? {...p,...p.sub} : p;
-const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[],collectionMode:'pickup',advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0,extensionUsed:false,extensionUntil:0,advanceExtensionSlotAt:0};
+const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[],collectionMode:'pickup',advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0,extensionUsed:false,extensionUntil:0,advanceExtensionSlotAt:0,pointsBonus:0};
 // n = how many group orders this session has already finished, so every new group gets its own order id and collection number.
 const slotSet = (win=10) => {
  const now=Date.now(),ms=makeSlotMs(now);
@@ -118,6 +118,7 @@ function App(){
  const [step,setStep]=useState(1);
  const [banners,setBanners]=useState([]);
  const nid=useRef(0), toastT=useRef(null), Pr=useRef(null);
+ const collectedGroup=useRef(null);
 
  const isOrg=uid===0, draft=P[uid], me=submitted(draft), org=P[0];
  const outlet={n:OUTLET_CAPS[g.oi].n,w:OUTLET_CAPS[g.oi].w,slots:Object.fromEntries(g.slotTimes.map((t,i)=>[t,OUTLET_CAPS[g.oi].caps[i]??OUTLET_CAPS[g.oi].laterCap]))};
@@ -136,7 +137,12 @@ function App(){
  };
  Pr.current=P;
  const members=P.filter(p=>p.in).map(submitted), subm=members.filter(p=>p.sub);
- const pointsInfo='8 Cherish points per $1 paid after rewards, rounded down to whole points';
+ const bonusEligible=now=>!g.cancelled&&g.collectionMode==='advance'&&g.advanceQualified&&g.advanceSlotAt===slotAt&&
+  slotAt>=g.advanceDeadlineAt+120*60000&&(slotAt>=now+120*60000||advanceExtensionApplies(g.slot,now));
+ const bonusPercent=g.sent?g.pointsBonus:(bonusEligible(Date.now())?10:0);
+ const orderPoints=value=>pointsFor(value,bonusPercent);
+ const pointsInfo='8 Cherish points per $1 paid after rewards'+(bonusPercent?' + 10% advance-order bonus':'')+', rounded down once to whole points';
+ const bonusTerms=g.collectionMode==='advance'?(bonusPercent?'Advance bonus '+(g.sent?'applied':'eligible')+': 10% extra points. Qualify at sending with at least two hours to collection, or retain original qualification during the one approved 15-minute extension.':'Advance bonus is not currently eligible. Choose a qualifying collection time before sending.'):'Advance orders earn 10% extra points when they qualify. Pickup earns the base rate.';
  const rw=p=>REWARDS.find(r=>r.id===p.rw);
  // Points are only spent when the group order is sent (see `send`), so every screen shows the real balance until then.
  const avail=me.pts;
@@ -144,7 +150,7 @@ function App(){
  const groupTotal=subm.reduce((s,p)=>s+owed(p),0);
  // Points follow the money: when everyone pays for their own, each person earns on their own items.
  // When the organiser pays for everyone, only the organiser earns points (on the whole group total).
- const earnOf=p=>g.pay==='sponsor'?(p.org?pointsFor(groupTotal):0):pointsFor(owed(p));
+ const earnOf=p=>g.pay==='sponsor'?(p.org?orderPoints(groupTotal):0):orderPoints(owed(p));
  const earners=g.pay==='sponsor'?members.filter(p=>p.org):subm;
  const declined=!!me.payFail&&!g.sent;
  // Nobody is charged until the order is sent. "Ready to pay" just means a payment method has been chosen.
@@ -179,7 +185,7 @@ function App(){
   <span>Collection mode</span><b>{collectionName}</b>
   <span>Collection</span><b>{g.slot}{g.sent&&' (locked)'}</b>
   <span>Payment</span><b>{g.pay==='sponsor'?org.n+' pays for everyone':'Everyone pays for their own order'}</b>
-  <span>Points rate</span><b>8 points per $1 paid</b>
+  <span>Points rate</span><b>8 points per $1 paid{bonusPercent===10&&' + 10% advance bonus'}</b>
  </div>;
  const statusText=g.cancelled?'Cancelled':g.sent?(g.status==='collected'?'Collected':g.status==='ready'?'Ready for collection':'Being prepared'):g.closed?'Ordering closed':'Ordering open';
  const invState=g.sent||g.cancelled||g.inv==='expired'?'expired':(g.inv==='full'||members.length>=g.size)?'full':'valid';
@@ -198,8 +204,8 @@ function App(){
  const snapshot=()=>({s:1,id:g.gid,name:g.name,at:g.sentAt||Date.now(),outlet:outlet.n,slot:g.slot,coll:g.coll,status:g.status||'preparing',pay:g.pay,total:groupTotal,
   collectionMode:g.collectionMode,advanceQualified:g.advanceQualified,advanceQualifiedAt:g.advanceQualifiedAt,advanceDeadlineAt:g.advanceDeadlineAt,advanceSlotAt:g.advanceSlotAt,
   extensionUsed:g.extensionUsed,extensionUntil:g.extensionUntil,advanceExtensionSlotAt:g.advanceExtensionSlotAt,
-  pointsRate:8,
-  payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:pointsFor(groupTotal)}:null,
+  pointsRate:8,pointsBonus:bonusPercent,
+  payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:orderPoints(groupTotal)}:null,
   members:subm.map(p=>p.n),
   orders:Object.fromEntries(subm.map(p=>[p.id,{items:p.items.map(i=>({...i})),owed:owed(p),rw:rw(p)?rw(p).t:'',free:freeOf(p)?freeOf(p).free:'',earn:g.status==='collected'?p.earned:earnOf(p)}]))});
  const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist];
@@ -367,7 +373,7 @@ function App(){
   const sponsor=g.pay==='sponsor';
   const amtOf=x=>sponsor?(x.org?groupTotal:0):owed(x);
   const methOf=x=>x.org&&meth?meth:(x.pmeth||'card');
-  setG(x=>({...x,sent:true,sentAt:at,status:'preparing'}));
+  setG(x=>({...x,sent:true,sentAt:at,status:'preparing',pointsBonus:bonusEligible(at)?10:0}));
   setP(p=>p.map(x=>{
    if(!x.in||!(x.sub||(sponsor&&x.org)))return x;
    const order=submitted(x), r=x.sub&&rw(order), amt=amtOf(order);
@@ -403,6 +409,8 @@ function App(){
   send(now);return true;
  };
  const markCollected=()=>{
+  if(!isOrg||!g.sent||g.cancelled||g.status!=='ready'||collectedGroup.current===g.gid)return;
+  collectedGroup.current=g.gid;
   setG(x=>({...x,status:'collected'}));
   const ids=earners.map(x=>x.id);
   setP(p=>p.map(x=>{
@@ -604,8 +612,8 @@ function App(){
      {freeOf(cart)&&<div className="row"><span className="sp">Free {freeOf(cart).free} (reward)</span>{$(0)}</div>}
      {rw(cart)&&sum(cart.items)-owed(cart)>0&&<div className="row voucher"><span className="sp">{rw(cart).t}</span>− {$(sum(cart.items)-owed(cart))}</div>}
      <div className="row" style={{marginTop:6}}><b className="sp">{g.pay==='sponsor'&&!isOrg?org.n+' is paying for you':'You pay'}</b><b>{g.pay==='sponsor'&&!isOrg?$(0):$(owed(cart))}</b></div>
-     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':g.pay==='sponsor'?<>You'll earn about <b>{pointsFor(groupTotal-(me.sub?owed(me):0)+owed(cart))} Cherish points</b>.</>:<>You'll earn about <b>{earnOf(cart)} Cherish points</b> when the group order is collected.</>}</div>
-     <div className="mute" style={{marginTop:6}}>{pointsInfo}.</div></div>
+     <div className="mute" style={{marginTop:8}}>{g.pay==='sponsor'&&!isOrg?org.n+' is paying, so the Cherish points for this group order go to him.':g.pay==='sponsor'?<>You'll earn about <b>{orderPoints(groupTotal-(me.sub?owed(me):0)+owed(cart))} Cherish points</b>.</>:<>You'll earn about <b>{earnOf(cart)} Cherish points</b> when the group order is collected.</>}</div>
+     <div className="mute" style={{marginTop:6}}>{pointsInfo}.<br/>{bonusTerms}</div></div>
    </>}
     {!!me.sub&&g.pay==='individual'&&owed(me)>0&&!g.sent&&(me.pmeth?<><Ban c="k">Payment method: {mName(me.pmeth,uid)}. You will be charged {$(owed(me))} only when {isOrg?'you send':'the organiser sends'} the group order.</Ban><button className="link" onClick={()=>goPay('me')}>Change payment method</button></>:<button className="btn" style={{marginTop:10}} onClick={()=>goPay('me')}>Choose payment method</button>)}
     {g.sent&&!!me.paid&&me.paidAmt>0&&<Ban c="k">Charged {$(me.paidAmt)} to {me.paidMeth}</Ban>}
@@ -613,7 +621,7 @@ function App(){
   </>}
 
   {screen==='pay'&&<>
-   <div className="card mute">{pointsInfo}</div>
+   <div className="card mute">{pointsInfo}<br/>{bonusTerms}</div>
    <div className="hero" style={{textAlign:'center'}}><div className="mute">{pm==='group'?'Group total':'You will pay when the order is sent'}</div><div className="big">{$(pm==='group'?groupTotal:owed(me))}</div>{pm==='group'&&<div className="mute">One payment covers everyone's order.</div>}<div className="mute" style={{marginTop:6}}>You will earn about <b>{earnOf(me)} Cherish points</b>{pm==='group'?' for the whole group order':''} when the group order is collected.</div></div>
    {err&&<Ban c="e">{err}</Ban>}
    <label className="l" style={{marginTop:0}}>Payment method</label>
@@ -670,7 +678,7 @@ function App(){
     <div className="card">{subm.map(p=><div key={p.id} style={{padding:'8px 0'}}><b>{p.n}</b>{p.items.map((i,k)=><div className="mute" key={k}>{itemLine(i)}</div>)}{freeOf(p)&&<div className="mute">Free {freeOf(p).free} (reward)</div>}</div>)}</div>
    </>:<div className="card"><b>My items</b>{me.items.length?me.items.map((i,k)=><div className="mute" key={k}>{itemLine(i)}</div>):<div className="mute">No items</div>}{freeOf(me)&&<div className="mute">Free {freeOf(me).free} (reward)</div>}</div>}
    <div className="h3">Cherish points</div>
-   <div className="mute" style={{marginBottom:8}}>{pointsInfo}</div>
+   <div className="mute" style={{marginBottom:8}}>{pointsInfo}<br/>{bonusTerms}</div>
    <div className="card">{earners.filter(p=>isOrg||p.id===uid).map(p=><div className="row" key={p.id} style={{padding:'4px 0'}}><span className="sp">{p.n}</span><b style={{color:'var(--ok)'}}>+ {g.status==='collected'?p.earned:earnOf(p)} points</b></div>)}{g.pay==='sponsor'&&!isOrg&&<div className="mute">{org.n} paid for this order, so {org.n} earns the points.</div>}<div className="mute" style={{marginTop:6}}>{g.pay==='sponsor'?(g.status==='collected'?'These points have been added to the organiser\'s account.':'The organiser earns points on the whole group order. They are credited once the order is marked collected.'):(g.status==='collected'?'These points have been added to each account.':'Points shown are what each person will get. They are credited once the organiser marks the order collected.')}</div></div>
    {isOrg&&<button className="btn ghost" onClick={saveGroup}>Save this group</button>}
    {isOrg&&g.status==='collected'&&<button className="btn" style={{marginTop:12}} onClick={newOrder}>Start a new group order</button>}
@@ -751,6 +759,7 @@ function App(){
     <div className="mute">{h.outlet} · pickup {h.slot}{h.coll?' · collection '+h.coll:''}</div>
     <div className="mute">{STAT[h.status]} · {h.pay==='sponsor'?'Organiser paid for everyone':'Everyone paid for their own order'}</div>
     {h.extensionUsed&&<div className="mute">One 15-minute deadline extension used; collection time unchanged.</div>}
+    {h.pointsBonus===10&&<div className="mute">10% advance-order points bonus applied; rounded down once after the full calculation.</div>}
     {h.pointsRate!=null&&<div className="mute">{h.pointsRate} Cherish points per $1 paid</div>}
     {h.multiplier!=null&&<div className="mute">{h.multiplier.toFixed(1)}× group points multiplier</div>}
     <div className="h3">Your order</div>

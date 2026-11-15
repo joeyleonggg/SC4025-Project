@@ -17,7 +17,7 @@ The selected collection time stays unchanged. The app blocks an extension if the
 - A changed collection time or mode cannot inherit the old exception. A new advance time must freshly satisfy the two-hour rule, and changing it does not restore the used extension allowance.
 - Capacity, unavailable items, payment readiness and cancellation checks remain in effect. The exception does not permit sending after collection.
 - Ordinary pickup retains its 15-minute preparation minimum.
-- History records extension use and the retained original qualification. The advance bonus itself is implemented separately in A07.
+- History records extension use and the retained original qualification. A07 now implements the [10% advance bonus](06-advance-points.md) using that retained qualification.
 
 ## Example for group discussion
 
@@ -45,4 +45,4 @@ The controlled-clock test reproduces the exact 9:50am / noon example without req
 5. Close ordering and send during the extension. Advance qualification should be retained, while a missing payment or full collection slot should still block sending.
 6. Collect the order and inspect history. Confirm the extension is recorded. Start a new group and confirm its extension allowance is available again.
 
-The points bonus remains the next item, A07.
+The points bonus is implemented and documented in [Improvement 06](06-advance-points.md).

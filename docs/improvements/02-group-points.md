@@ -2,11 +2,11 @@
 
 ## Current requirement
 
-A04 implements FR-06 and US-08 from the latest report. It supersedes the earlier chat decision to increase points with group size. The advance-order bonus is a separate pending item, A07.
+A04 implements FR-06 and US-08 from the latest report. It supersedes the earlier chat decision to increase points with group size. A07 now adds the separate [10% advance-order bonus](06-advance-points.md); this document describes the ordinary pickup baseline.
 
 ## Calculation
 
-Points = floor(amount actually paid after personal rewards × 8).
+Ordinary pickup points = floor(amount actually paid after personal rewards × 8). Qualifying advance orders use the A07 formula with 10% extra points and one final rounding step.
 
 Amounts are normalised to integer cents before calculating points. Rounding happens after multiplying by the point rate, rather than rounding down the dollar spend first.
 

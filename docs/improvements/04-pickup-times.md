@@ -19,7 +19,7 @@ The outlet receives an order when the organiser sends it. Ordinary pickup theref
 
 Creation and replacement choices anticipate sending at the later of the current time and the ordering deadline. Creation checks again after the organiser chooses the ordering window. Sending rechecks the current lead time and capacity, as well as the existing stock and payment checks. A stale time or a full slot requires a valid replacement.
 
-For advance orders, creation saves the qualification time, original planned deadline and collection timestamp. A replacement validates and records fresh qualification. Switching to pickup clears those fields. A06 now uses these records to preserve the original advance qualification during the one approved 15-minute extension. See [the extension rules](05-deadline-extension.md). The 10% bonus remains pending A07.
+For advance orders, creation saves the qualification time, original planned deadline and collection timestamp. A replacement validates and records fresh qualification. Switching to pickup clears those fields. A06 now uses these records to preserve the original advance qualification during the one approved 15-minute extension. See [the extension rules](05-deadline-extension.md). Qualifying advance orders now receive the [A07 10% points bonus](06-advance-points.md).
 
 Only the organiser can change collection choices before sending. Sent and cancelled groups cannot change mode or time. Existing history retains its original values.
 

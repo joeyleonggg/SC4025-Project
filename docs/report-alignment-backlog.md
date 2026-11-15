@@ -104,7 +104,9 @@ Allow the authorised 15-minute extension while retaining the selected collection
 
 ### A07 Advance-order bonus
 
-**Status** Pending; depends on A04–A06.
+**Status** Complete. Delivery commit: `Award ten percent bonus for qualifying advance orders`.
+
+**Verification** Production build and all twelve automated checks passed. Checks cover pickup versus advance awards, single rounding, personal discounts, membership independence, extension preservation, rates fixed at sending, no credit before collection, one-time crediting, cancellation and archived bonus/awards.
 
 **Requirement** Section 5.2, Table 4.3 and Section 4.4.
 
@@ -112,7 +114,7 @@ Award 10% extra points for qualifying advance orders. Preserve the bonus during 
 
 **Acceptance checks** Using the proposed single-rounding rule, a $6.30 ordinary payment earns 50 points and a qualifying advance payment earns 55. Membership count has no effect. An authorised extension retains the award. Cancelling does not award points and collection credits once through the normal flow.
 
-**Decision to record** The report does not define rounding order. Confirm or document rounding down once after multiplying the final personal payment by 8 and 1.1.
+**Recorded rounding decision** The MVP rounds down once after multiplying the final personal payment by 8 and 1.1. The report does not define rounding order. For example, a $6.24 advance payment earns 54 points, rather than 53 from rounding the base award first. This interpretation is documented for group discussion.
 
 ### A08 Multiple mock cards and decline recovery
 
@@ -215,10 +217,10 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 3. The advance-order extension exception needs an explicit statement alongside the two-hour qualification rule.
 4. Extension boundary resolved: one full 15-minute extension per group; no shortening and no extension reaching or passing collection.
 5. Retention duration and leaving-group deletion scope need a policy compatible with history and saved groups.
-6. Confirm the demo invitation interaction and the points rounding convention when those items are reached.
+6. Confirm the demo invitation interaction at A10. A07 documents single rounding after the full bonus calculation as the MVP points convention for group discussion.
 
 ## Delivery routine
 
 For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-The next implementation item is A07, advance-order bonus. Unresolved policy details remain recorded above for discussion.
+The next implementation item is A08, multiple mock cards and decline recovery. Unresolved policy details remain recorded above for discussion.

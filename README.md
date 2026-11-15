@@ -48,11 +48,11 @@ See [the payment decision and test steps](docs/improvements/01-payment-choice.md
 
 ## Loyalty points
 
-Each person earns 8 Cherish points per $1 actually paid after their personal reward discount, rounded down to whole points. A $6.30 payment earns 50 points; a $4.30 payment earns 34 points. Group membership and capacity do not change the award.
+For ordinary pickup, each person earns 8 Cherish points per $1 actually paid after their personal reward discount, rounded down to whole points. A $6.30 payment earns 50 points; a $4.30 payment earns 34 points. Group membership and capacity do not change the award.
 
 Points are credited only when the organiser marks the order collected. New receipts record the baseline rate and earned points. Older recorded awards and group multipliers remain intact in history.
 
-This follows FR-06 and US-08 in the latest report and supersedes the earlier group-size multiplier. The separate advance-order bonus is pending A07.
+This follows FR-06 and US-08 in the latest report and supersedes the earlier group-size multiplier. Qualifying advance orders now earn 10% extra points, rounded down once after the full calculation.
 
 See [the points calculation and test steps](docs/improvements/02-group-points.md).
 
@@ -62,7 +62,7 @@ Choose **Pickup** for ASAP, three quick times and the later-time dropdown, or **
 
 Pickup requires at least 15 minutes from sending; advance orders normally require at least two hours. The app validates creation, replacement and sending against the timing and mock capacity rules. Next-day choices show Singapore dates, and sending locks the mode, outlet and collection time. History retains the chosen mode and time.
 
-One 15-minute extension per group preserves original advance qualification through the extended deadline, without changing collection time. The advance-order points bonus is pending A07. Outlet opening hours are not modelled. The scheduling horizon remains 24 hours.
+One 15-minute extension per group preserves original advance qualification through the extended deadline, without changing collection time. Qualifying advance orders receive a 10% points bonus, preserved during that extension. Outlet opening hours are not modelled. The scheduling horizon remains 24 hours.
 
 See [collection rules and manual test steps](docs/improvements/04-pickup-times.md). From `frontend`, rerun the automated collection checks with `npm run test:collection` and build with `npm run build`.
 
@@ -71,3 +71,11 @@ See [collection rules and manual test steps](docs/improvements/04-pickup-times.m
 Mary can extend once per group by a full 15 minutes. Collection stays unchanged. Originally qualifying advance orders can still be sent during the extension even after crossing the normal two-hour boundary. Changing the collection time requires fresh qualification, and an extension cannot reach or pass collection.
 
 See [the extension rules, noon example and test steps](docs/improvements/05-deadline-extension.md). Automated checks run with `npm run test:collection` from `frontend`.
+
+## Advance-order points bonus
+
+Qualifying advance orders earn 10% extra points on each person's actual payment after rewards. Round down once after multiplying the payment by 8 and 1.1: $6.30 earns 55 points, while ordinary pickup earns 50. Group size does not change the rate.
+
+The cart and payment screen explain eligibility before submission. The applied bonus is fixed when the organiser sends, preserved through the approved extension exception, and credited once at collection. History records the bonus and personal award. Cancelling earns no points.
+
+See [the formula, eligibility and test steps](docs/improvements/06-advance-points.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.

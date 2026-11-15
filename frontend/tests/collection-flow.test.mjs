@@ -73,18 +73,20 @@ test('advance choices reserve two hours after the deadline and replacements requ
 
 for(const mode of ['pickup','advance'])test(mode+' rechecks send lead time, locks selection and preserves history',()=>{
  const a=app('2026-11-16T22:51:00+08:00');a.start();if(mode==='advance')a.click('Advance order');
- a.choose(8);a.create();const slot=a.g().slot,slotAt=a.g().slotMs[8];assert(slot.includes('17 Nov'));
- a.submit();const min=mode==='advance'?120:15;
+ a.choose(8);a.create();const initial=a.state[6][0].pts,award=mode==='advance'?55:50;const slot=a.g().slot,slotAt=a.g().slotMs[8];assert(slot.includes('17 Nov'));
+ a.submit();assert.equal(a.state[6][0].earned,0);const min=mode==='advance'?120:15;
  a.at(slotAt-min*minute+1);assert(a.button('Send group order to outlet').props.disabled);
  // Even a previously rendered enabled handler must check the current time.
  a.at(slotAt-min*minute);const send=a.button('Send group order to outlet');assert(!send.props.disabled);
  a.at(slotAt-min*minute+1);send.props.onClick();assert(!a.g().sent);
  a.at(slotAt-min*minute);a.click('Send group order to outlet');assert(a.g().sent);assert.equal(a.g().slot,slot);assert(a.text().includes('(locked)'));
+ assert.equal(a.g().pointsBonus,mode==='advance'?10:0);assert.equal(a.state[6][0].pts,initial);
  assert(!a.text().includes('Change pickup time or group size'));
- a.aria('Switch demo user');a.click('Advance order status (outlet)');a.click('Mark as collected');a.click('View order history');a.click('Details');
- assert(a.text().includes(slot));assert(a.text().includes(mode==='advance'?'Advance order':'Pickup'));
+ a.at(slotAt+24*60*minute);
+ a.aria('Switch demo user');a.click('Advance order status (outlet)');const collect=a.button('Mark as collected');a.click('Mark as collected');collect.props.onClick();assert.equal(a.state[6][0].earned,award);assert.equal(a.state[6][0].pts,initial+award);a.click('View order history');a.click('Details');
+ assert(a.text().includes(award+' Cherish points earned'));assert(a.text().includes(slot));assert(a.text().includes(mode==='advance'?'Advance order':'Pickup'));
  a.state[8]=null;a.click('Start new order');const history=a.state[14][0];assert.equal(history.collectionMode,mode);assert.equal(history.slot,slot);
- assert.equal(history.advanceQualified,mode==='advance');
+ assert.equal(history.advanceQualified,mode==='advance');assert.equal(history.pointsBonus,mode==='advance'?10:0);assert.equal(history.orders[0].earn,award);
 });
 
 test('ASAP is sendable at the planned deadline with the preparation minimum intact',()=>{
@@ -115,11 +117,11 @@ test('one full extension preserves the noon advance order at 10.04 and in histor
  assert.equal(a.g().advanceDeadlineAt,original);assert(a.button('Extend 15 minutes').props.disabled);
  a.button('Extend 15 minutes').props.onClick();assert.equal(a.g().deadlineAt,original+15*minute);
  a.at(Date.parse('2026-11-16T10:04:00+08:00'));a.click('Status');a.click('Close ordering early');a.click('Close ordering');
- a.click('Send group order to outlet');assert(a.g().sent);assert.equal(a.g().slot,slot);
+ a.click('Send group order to outlet');assert(a.g().sent);assert.equal(a.g().slot,slot);assert.equal(a.g().pointsBonus,10);
  a.click('Group');assert(!a.text().includes('Extend 15 minutes'));
  a.click('Status');a.aria('Switch demo user');a.click('Advance order status (outlet)');a.click('Mark as collected');a.click('View order history');a.click('Details');
  assert(a.text().includes('One 15-minute deadline extension used'));a.state[8]=null;a.click('Start new order');
- const old=a.state[14][0];assert(old.extensionUsed);assert(old.advanceQualified);assert.equal(old.slot,slot);
+ const old=a.state[14][0];assert.equal(old.pointsBonus,10);assert.equal(old.orders[0].earn,55);assert(old.extensionUsed);assert(old.advanceQualified);assert.equal(old.slot,slot);
  assert(!a.g().extensionUsed);assert.equal(a.g().extensionUntil,0);
 });
 
@@ -143,4 +145,32 @@ test('extension permissions and full-duration collection boundary are enforced',
  a.button('Extend 15 minutes').props.onClick();assert(!a.g().extensionUsed);assert.equal(a.g().deadlineAt,a.g().advanceDeadlineAt);
  a.at(slotAt+1);a.button('Extend 15 minutes').props.onClick();assert(!a.g().extensionUsed);
  a.at(Date.parse('2026-11-16T09:41:00+08:00'));a.click('Cancel group order');a.find(n=>n.type==='button'&&n.props.className==='btn'&&n.props.children==='Cancel group order').props.onClick();assert(a.g().cancelled);assert(!a.text().includes('Extend 15 minutes'));
+});
+
+test('bonus rounds down once on actual personal spend, including cents and zero',()=>{
+ const raw=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
+ const points=vm.runInNewContext(raw.match(/const pointsFor = (.*);/)[1]);
+ for(const [amount,ordinary,advance]of [[0,0,0],[.01,0,0],[.13,1,1],[4.3,34,37],[6.24,49,54],[6.3,50,55]]){
+  assert.equal(points(amount),ordinary);assert.equal(points(amount,10),advance);
+ }
+});
+
+test('advance cart and checkout show bonus terms; personal discount and membership are isolated',()=>{
+ const a=app();a.start();a.click('Advance order');a.choose(5);a.create();const initial=a.state[6][0].pts;
+ a.aria('Add Ben');a.click('Menu');a.aria('Add '+data.MENU.find(m=>m.id===1).name);a.click('Add to order · $6.30');a.click('View my order · $6.30');
+ assert(a.text().includes('55 Cherish points'));assert(a.text().includes('Advance bonus eligible: 10% extra points'));
+ a.click('Group');a.aria('Add Calvin');a.aria('Add Dylan');a.click('My order1');assert(a.text().includes('55 Cherish points'));
+ a.click('View eligible rewards');a.find(n=>n.props.className?.startsWith('opt ')&&n.props.onClick&&JSON.stringify(n.props.children).includes('$2 off')).props.onClick();
+ assert(a.text().includes('37 Cherish points'));a.click('Submit my order');assert(a.text().includes('37 Cherish points'));assert(a.text().includes('10% advance-order bonus'));a.click('Confirm payment method');
+ // Ben's undiscounted personal order still gets the full 55-point estimate.
+ a.aria('Switch demo user');a.click('Ben');a.click('Order');a.click('Menu');a.aria('Add '+data.MENU.find(m=>m.id===1).name);a.click('Add to order · $6.30');a.click('View my order · $6.30');assert(a.text().includes('55 Cherish points'));a.click('Submit my order');a.click('Confirm payment method');
+ a.aria('Switch demo user');a.click('Mary Ng (organiser)');a.click('Order');a.click('Status');a.click('Close ordering early');a.click('Close ordering');a.click('Send group order to outlet');
+ assert.equal(a.state[6][0].paidAmt,4.3);assert.equal(a.state[6][0].pts,initial-200);assert.equal(a.state[6][0].earned,0);
+ a.aria('Switch demo user');a.click('Advance order status (outlet)');a.click('Mark as collected');assert.equal(a.state[6][0].earned,37);assert.equal(a.state[6][0].pts,initial-200+37);assert.equal(a.state[6][1].earned,55);assert.equal(a.state[6][2].earned,0);
+});
+
+test('switching to pickup removes the bonus and cancelling earns no points',()=>{
+ const a=noonAdvance(),initial=a.state[6][0].pts;a.click('Change pickup time or group size');a.click('Pickup');a.select('change-pickup',a.g().slotTimes[6]);a.click('Done');a.click('My order1');
+ assert(a.text().includes('50 Cherish points'));assert(!a.text().includes('Advance bonus eligible'));
+ a.click('Group');a.click('Cancel group order');a.find(n=>n.type==='button'&&n.props.className==='btn'&&n.props.children==='Cancel group order').props.onClick();assert(a.g().cancelled);assert.equal(a.state[6][0].pts,initial);assert.equal(a.state[6][0].earned,0);assert.equal(a.g().pointsBonus,0);
 });
