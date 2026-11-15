@@ -153,6 +153,7 @@ function App(){
  // When the organiser pays for everyone, only the organiser earns points (on the whole group total).
  const earnOf=p=>g.pay==='sponsor'?(p.org?orderPoints(groupTotal):0):orderPoints(owed(p));
  const earners=g.pay==='sponsor'?members.filter(p=>p.org):subm;
+ const canSeePayment=p=>isOrg||p.id===uid;
  const declined=!!me.payFail&&!g.sent;
  // Nobody is charged until the order is sent. "Ready to pay" just means a payment method has been chosen.
  const needsMethod=p=>g.pay==='individual'&&!!p.sub&&owed(p)>0&&!cardAllowed(p.pmeth,p);
@@ -212,7 +213,7 @@ function App(){
  const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist];
  const myHist=histAll.filter(h=>h.orders[uid]||(uid===0&&(h.pay==='sponsor'||h.members.includes(USERS0[0].n))));
 
- const say=(t)=>{clearTimeout(toastT.current);setToast({t,mid:true});toastT.current=setTimeout(()=>setToast(''),TOAST_MS)};
+ const say=(t)=>{clearTimeout(toastT.current);setToast({t,mid:true,to:uid});toastT.current=setTimeout(()=>setToast(''),TOAST_MS)};
  const login=()=>{
   const acc=ACCOUNTS.find(a=>a.identifier.toLowerCase()===idf.trim().toLowerCase());
   if(!acc||acc.password!==pwd){setLoginErr('Incorrect email or password.');return}
@@ -443,6 +444,7 @@ function App(){
  const goPay=mode=>{setPm(mode);setSel(cardAllowed(me.pmeth,me)?me.pmeth:methodsFor(uid).find(c=>cardAllowed(c.id,me))?.id||'');setErr('');setScr('pay')};
  const othersDone=()=>{
   // DEMO ONLY: real participants act through their own devices.
+  if(!isOrg)return;
   const who=members.filter(x=>!x.org&&!x.sub&&DEMO_ORDERS[x.id]);
   if(!orderingOpen())return say('Ordering is closed');
   if(!who.length)return say('Everyone has already submitted');
@@ -471,7 +473,7 @@ function App(){
  const back={join:'home',create:'home',pay:'wallet',paid:'track',repeat:'more',notifs:'more'};
  const goBack=()=>{if(screen==='create'&&step>1&&step<4)setStep(step-1);else setScr(back[screen])};
  const expiredBtns=<div className="col"><button className="btn" disabled={!canExtend(Date.now())} onClick={extend}>Add 15 more minutes</button><button className="btn ghost" disabled={subm.length===0} onClick={()=>{setSheet(null);setG(x=>({...x,expired:false}));setScr('track')}}>Continue with {subm.length} order{subm.length===1?'':'s'}</button><button className="link danger" onClick={()=>setSheet({k:'cancel'})}>Cancel group order</button></div>;
- const pstat=p=>g.pay==='sponsor'?<Tag c="ok">Organiser pays</Tag>:g.sent&&p.sub&&p.paid?<Tag c="ok">Paid</Tag>:p.payFail&&!g.sent?<Tag c="w">Payment declined</Tag>:!p.sub?<Tag>–</Tag>:owed(p)===0?<Tag c="ok">Nothing to pay</Tag>:p.pmeth?<Tag c="ok">Payment ready</Tag>:<Tag c="w">Payment method needed</Tag>;
+ const pstat=p=>!canSeePayment(p)?null:g.pay==='sponsor'?<Tag c="ok">Organiser pays</Tag>:g.sent&&p.sub&&p.paid?<Tag c="ok">Paid</Tag>:p.payFail&&!g.sent?<Tag c="w">Payment declined</Tag>:!p.sub?<Tag>–</Tag>:owed(p)===0?<Tag c="ok">Nothing to pay</Tag>:p.pmeth?<Tag c="ok">Payment ready</Tag>:<Tag c="w">Payment method needed</Tag>;
 
  if(scr==='login')return <div className="phone"><div className="splash">
   <div className="logo">Ya Kun</div><div style={{fontSize:18,fontWeight:700,marginBottom:6}}>Log in with Ya Kun Cherish</div>
@@ -660,7 +662,7 @@ function App(){
        {p.id!==uid&&!g.closed&&!p.sub&&!p.org&&<button className="link" onClick={e=>{e.stopPropagation();remind(p,'order before '+g.deadline)}}>Remind</button>}{p.id!==uid&&!g.sent&&needsMethod(p)&&<button className="link" onClick={e=>{e.stopPropagation();remind(p,'choose a payment method before the order is sent')}}>Remind</button>}</div>
       {open===p.id&&<div className="expand">{p.items.length?p.items.map((i,k)=><div className="row" key={k}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}</span>× {i.q}</div>):<div className="mute">No items yet</div>}{!!p.sub&&freeOf(p)&&<div className="row"><span className="sp">{freeOf(p).free}<div className="mute">Free reward</div></span>× 1</div>}</div>}</div>)}
    </>}
-   {!g.sent&&members.filter(p=>p.payFail&&p.id!==uid).map(p=><Ban key={'pf'+p.id} c="e">{'Payment declined for '+p.n+'. The order was not sent. '+p.n+' needs to choose another payment method.'}</Ban>)}
+   {isOrg&&!g.sent&&members.filter(p=>p.payFail&&p.id!==uid).map(p=><Ban key={'pf'+p.id} c="e">{'Payment declined for '+p.n+'. The order was not sent. '+p.n+' needs to choose another payment method.'}</Ban>)}
    {g.sent?<button className="btn" onClick={()=>setScr('done')}>View collection details</button>:isOrg&&<>
     {!g.closed&&<button className="btn ghost" style={{marginBottom:10}} onClick={()=>setSheet({k:'confirm',title:'Close ordering now?',msg:"Nobody will be able to submit or change an order after this, even if the deadline hasn't passed.",label:'Close ordering',action:()=>{closeEarly();setSheet(null)}})}>Close ordering early</button>}
     <button className="btn" disabled={!canSend} onClick={()=>{if(g.pay==='sponsor'){goPay('group')}else if(trySend())setScr('done')}}>{g.pay==='sponsor'?'Pay '+$(groupTotal)+' and send to outlet':'Send group order to outlet'}</button>
@@ -801,18 +803,18 @@ function App(){
    {sheet.k==='confirm'&&<><h2 className="ttl">{sheet.title}</h2><div className="mute" style={{marginBottom:18}}>{sheet.msg}</div><button className="btn" onClick={sheet.action}>{sheet.label}</button><button className="btn ghost" style={{marginTop:10}} onClick={()=>setSheet(null)}>Cancel</button></>}
    {sheet.k==='cancel'&&<><h2 className="ttl">Cancel this group order?</h2><div className="mute" style={{marginBottom:18}}>Everyone's items are removed and the invite link stops working.</div><button className="btn" onClick={cancelOrder}>Cancel group order</button><button className="btn ghost" style={{marginTop:10}} onClick={()=>setSheet(null)}>Keep order</button></>}
    {sheet.k==='demo'&&<><b style={{fontSize:18}}>Demo controls</b><div className="mute">For presenting the prototype only.</div>
-    <label className="l">Viewing as</label><div className="chips">{P.map(p=><button key={p.id} className={'chip '+(uid===p.id?'on':'')} onClick={()=>{setUid(p.id);setSheet(null);if(scr!=='login')setScr('home')}}>{p.n}{p.org?' (organiser)':''}</button>)}</div>
+    <label className="l">Viewing as</label><div className="chips">{P.map(p=><button key={p.id} className={'chip '+(uid===p.id?'on':'')} onClick={()=>{setUid(p.id);setSheet(null);setToast('');setErr('');setReceipt(null);setSel('card');setPm('me');setOpen(null);if(scr!=='login')setScr('home')}}>{p.n}{p.org?' (organiser)':''}</button>)}</div>
     <label className="l">Simulate</label>
     {[['Others submit their orders',othersDone],['Deadline passes',()=>{setG(x=>({...x,deadlineAt:Date.now()}));setSheet(null)}],
      [g.sold.length?'Milo is unavailable (tap to restore)':'Milo becomes unavailable',()=>{setG(x=>({...x,sold:x.sold.length?[]:[8]}));note(g.sold.length?'Milo is available again at '+outlet.n:'Milo is now unavailable at '+outlet.n,'alert');setSheet(null)}],
      ['Collection slot fills up',()=>{setG(x=>({...x,slotGone:true}));note(g.slot+' is no longer available','alert');setSheet(null)}],
-     ['Advance order status (outlet)',()=>{advance();setSheet(null)}]].map(([t,f])=><button key={t} className="btn ghost sm" style={{width:'100%',marginBottom:8}} onClick={f}>{t}</button>)}
-    <label className="l">Decline payment when the order is sent</label><div className="chips">{members.filter(p=>g.pay==='individual'||p.org).map(p=><button key={p.id} className={'chip '+(g.failFor.includes(p.id)?'on':'')} onClick={()=>setG(x=>({...x,failFor:x.failFor.includes(p.id)?x.failFor.filter(i=>i!==p.id):[...x.failFor,p.id]}))}>{p.n}{p.org?' (organiser)':''}</button>)}</div><div className="mute" style={{marginTop:6}}>Highlighted people have their payment declined once when the organiser sends the order (they must have submitted an order with an amount to pay). The order is not sent until they choose another method.</div>
+     ['Advance order status (outlet)',()=>{advance();setSheet(null)}]].filter(([title])=>isOrg||title!=='Others submit their orders').map(([t,f])=><button key={t} className="btn ghost sm" style={{width:'100%',marginBottom:8}} onClick={f}>{t}</button>)}
+    <label className="l">Decline payment when the order is sent</label><div className="chips">{members.filter(p=>canSeePayment(p)&&(g.pay==='individual'||p.org)).map(p=><button key={p.id} className={'chip '+(g.failFor.includes(p.id)?'on':'')} onClick={()=>setG(x=>({...x,failFor:x.failFor.includes(p.id)?x.failFor.filter(i=>i!==p.id):[...x.failFor,p.id]}))}>{p.n}{p.org?' (organiser)':''}</button>)}</div><div className="mute" style={{marginTop:6}}>{isOrg?'Highlighted people':'Your highlighted account'} {isOrg?'have their':'has its'} payment declined once when the organiser sends the order (a submitted order with an amount to pay is required). The order is not sent until they choose another method.</div>
     <label className="l">Invitation link</label><div className="chips">{['valid','expired','full'].map(v=><button key={v} className={'chip '+(g.inv===v?'on':'')} onClick={()=>setG(x=>({...x,inv:v}))}>{v}</button>)}</div>
     <button className="btn ghost sm" style={{width:'100%',marginTop:14}} onClick={()=>window.location.reload()}>Reset demo</button></>}
   </div></div>}
   {banner&&<div className="push" onClick={()=>{setBanners([]);markSeen();setScr('notifs')}}><Icon n={banner.i} s={18}/><div className="sp"><b>Ya Kun Together</b><div className="mute">{banner.t}</div></div></div>}
-  {toast&&<div className={'toast'+(toast.mid?' mid':'')}>{toast.t}</div>}
+  {toast&&toast.to===uid&&<div className={'toast'+(toast.mid?' mid':'')}>{toast.t}</div>}
  </div>;
 }
 

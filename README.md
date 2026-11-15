@@ -87,3 +87,11 @@ Each demo account has two saved mock cards. If sending is declined, nobody is ch
 Successful sending charges each person's own total once. Personal receipts and history retain the selected card. Mary has cards ending 1111 and 8008; Ben has 2222 and 8018. All cards and charges are simulated.
 
 See [the payment recovery guide and test steps](docs/improvements/07-payment-recovery.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.
+
+## Payment status privacy
+
+Mary can see each participant's payment readiness or decline, without their card details. Each participant sees their own payment status, cards, decline notifications and receipts. Other participants do not see a named failure or another person's card details.
+
+Switching demo accounts clears temporary payment messages and receipts. Payment simulation controls show participants only their own account; Mary can simulate the group members' payments.
+
+See [the visibility rules and manual test steps](docs/improvements/08-payment-privacy.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.

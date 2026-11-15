@@ -130,7 +130,9 @@ Provide a meaningful alternative saved mock card for a declined participant, ret
 
 ### A09 Payment status privacy
 
-**Status** Pending.
+**Status** Complete. Delivery commit: `Limit payment status and messages to authorised viewers`.
+
+**Verification** Production build and all seventeen automated checks passed. Privacy checks cover Mary/Ben/Calvin views of missing methods, targeted reminders, declines and recovery; immediate switching; Home/Group/Status/cart/Pay/notifications/receipts/history; private transient state; and scoped demo payment controls.
 
 **Requirement** FR-05, FR-11 and Section 5.5.
 
@@ -225,4 +227,4 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 
 For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-The next implementation item is A09, payment status privacy. Unresolved policy details remain recorded above for discussion.
+The next implementation item is A10, invitation access and joining flow. Unresolved policy details remain recorded above for discussion.

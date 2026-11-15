@@ -45,7 +45,7 @@ function app(at='2026-11-16T09:01:00+08:00'){
  };
  const create=()=>{click('Next: ordering time');click('Create group');assert(g().live);click('View group');};
  const submit=()=>{click('Menu');aria('Add '+data.MENU.find(m=>m.id===1).name);click('Add to order · $6.30');click('View my order · $6.30');click('Submit my order');click('Confirm payment method');click('Status');click('Close ordering early');click('Close ordering');};
- return {state,g,find,button,click,aria,select,option,text,choose,start,create,submit,now:()=>now,at:value=>{now=value;}};
+ return {state,g,find,button,click,aria,select,option,text,label,choose,start,create,submit,now:()=>now,at:value=>{now=value;}};
 }
 
 test('pickup retains quick choices, includes preparation time and rejects stale creation',()=>{
@@ -213,4 +213,56 @@ test('Mary can recover her own decline; exhausting both mock cards stays blocked
  a.state[7]={...a.g(),failFor:[0]};a.click('Send group order to outlet');assert(!a.g().sent);assert.equal(a.state[6][0].failedMethods.length,2);
  a.click('Pay');a.click('Choose payment method');assert(cardButton(a,0,'card').props.disabled);assert(cardButton(a,0,'backup').props.disabled);assert(a.button('Confirm payment method').props.disabled);assert(a.text().includes('Both saved mock cards were declined'));
  a.button('Confirm payment method').props.onClick();assert.equal(a.state[6][0].pmeth,null);assert.equal(a.state[6][0].paidAmt,0);
+});
+
+const noOtherCards=(a,owner)=>{
+ for(const user of [0,1,2])if(user!==owner)for(const card of data.SAVED_CARDS[user])assert(!a.text().includes('Card ending '+card.last4),'Leaked card '+card.last4+' to '+owner);
+};
+function paymentTrio(){
+ const a=app();a.start();a.choose(5);a.create();a.aria('Add Ben');a.aria('Add Calvin');personalOrder(a);
+ switchUser(a,'Ben');a.click('Order');personalOrder(a);switchUser(a,'Calvin');a.click('Order');personalOrder(a);
+ switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Status');return a;
+}
+
+test('only Mary and Ben can see his missing payment method and targeted reminder',()=>{
+ const a=paymentTrio();a.state[6]=a.state[6].map(p=>p.id===1?{...p,pmeth:null}:p);
+ const row=a.find(n=>n.props.className==='card click'&&a.label(n).includes('Ben'));
+ assert(a.label(row).includes('Payment method needed'));noOtherCards(a,0);
+ a.button('Remind').props.onClick({stopPropagation(){}});const reminder=a.state[10].find(n=>n.t.includes('choose a payment method before'));assert.deepEqual(Array.from(reminder.to),[1]);
+ switchUser(a,'Calvin');a.click('Order');a.click('Status');assert(!a.text().includes('Payment method needed'));assert(!a.text().includes('choose a payment method before'));noOtherCards(a,2);
+ a.aria('Notifications');assert(!a.text().includes('choose a payment method before'));noOtherCards(a,2);
+ switchUser(a,'Ben');a.click('Order');a.click('Status');assert(a.text().includes('Payment method needed'));a.aria('Notifications');assert(a.text().includes('choose a payment method before'));noOtherCards(a,1);
+});
+
+test('Ben decline and recovery stay private across screens, toasts, notifications and receipts',()=>{
+ const a=paymentTrio();a.click('Close ordering early');a.click('Close ordering');a.state[7]={...a.g(),failFor:[1]};a.click('Send group order to outlet');
+ assert(a.text().includes('Payment declined for Ben'));noOtherCards(a,0);
+ const failure=a.state[10].find(n=>n.t.includes('Card ending 2222 was declined'));assert.deepEqual(Array.from(failure.to),[1]);
+ const overview=a.state[10].find(n=>n.t.startsWith('Payment declined for Ben'));assert.deepEqual(Array.from(overview.to),[0]);
+ a.aria('Notifications');assert(a.text().includes('Payment declined for Ben'));noOtherCards(a,0);
+ // Switching occurs immediately: the mock clock never dismisses toasts or pushes.
+ switchUser(a,'Calvin');for(const screen of ['home','group','track','cart','wallet','notifs']){
+  a.state[0]=screen;assert(!a.text().includes('Payment declined for Ben'));assert(!a.text().includes('Ben needs to choose'));assert(!a.text().includes('was declined'));noOtherCards(a,2);
+ }
+ switchUser(a,'Ben');a.click('Order');a.click('Status');assert(a.text().includes('Your payment was declined'));assert(!a.text().includes('Payment declined for Ben'));noOtherCards(a,1);
+ a.aria('Notifications');assert(a.text().includes('Card ending 2222 was declined'));noOtherCards(a,1);
+ a.click('Pay');a.click('Choose payment method');cardButton(a,1,'backup').props.onClick();a.click('Confirm payment method');
+ const recovered=a.state[10].find(n=>n.t.startsWith('Ben chose a new payment method'));assert.deepEqual(Array.from(recovered.to),[0]);
+ switchUser(a,'Calvin');a.aria('Notifications');assert(!a.text().includes('Ben chose a new payment method'));assert(!a.text().includes('was declined'));noOtherCards(a,2);
+ switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Status');
+ const row=a.find(n=>n.props.className==='card click'&&a.label(n).includes('Ben'));assert(a.label(row).includes('Payment ready'));assert(!a.text().includes('Payment declined for Ben'));noOtherCards(a,0);a.click('Send group order to outlet');
+ for(const n of a.state[10].filter(n=>n.t.startsWith('You were charged'))){assert.equal(n.to.length,1);assert(n.t.includes('Card ending '+(n.to[0]===1?'8018':data.CARD_LAST4[n.to[0]])));}
+ a.aria('Switch demo user');a.click('Advance order status (outlet)');a.click('Mark as collected');
+ for(const [name,id]of [['Mary Ng (organiser)',0],['Ben',1],['Calvin',2]]){
+  switchUser(a,name);a.click('Pay');noOtherCards(a,id);a.state[0]='repeat';a.click('Details');noOtherCards(a,id);
+ }
+});
+
+test('demo payment controls expose only the current participant and clear previous payment UI state',()=>{
+ const a=paymentTrio();a.state[16]='Previous private payment error';a.state[20]={amt:99,meth:'Card ending 2222'};
+ switchUser(a,'Calvin');assert.equal(a.state[16],'');assert.equal(a.state[20],null);a.aria('Switch demo user');
+ assert(!a.text().includes('Others submit their orders'));
+ const controls=a.find(n=>n.props.className==='chips'&&a.label(n)==='Calvin');assert.equal(a.label(controls),'Calvin');
+ switchUser(a,'Mary Ng (organiser)');a.aria('Switch demo user');assert(a.text().includes('Others submit their orders'));
+ const all=a.find(n=>n.props.className==='chips'&&a.label(n)==='Mary Ng (organiser)BenCalvin');assert(a.label(all).includes('Ben'));
 });

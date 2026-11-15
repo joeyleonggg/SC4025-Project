@@ -25,7 +25,7 @@ The remaining demo accounts also have two cards. These are mock identifiers; no 
 - A new group resets its card selection and declined-card flags. Existing receipt data stays recorded.
 - If both saved mock cards are deliberately declined, sending remains blocked. The demo explains that it must be reset to try again; it does not silently reuse a declined card.
 
-The separate review of who can see payment status and failure messages remains A09. This item adds recovery without completing that privacy review.
+A09 now limits payment status and failure messages to their intended viewers. See [payment status privacy](08-payment-privacy.md) for the visibility rules and checks.
 
 ## Verification
 
