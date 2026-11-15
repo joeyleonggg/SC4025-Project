@@ -174,3 +174,43 @@ test('switching to pickup removes the bonus and cancelling earns no points',()=>
  assert(a.text().includes('50 Cherish points'));assert(!a.text().includes('Advance bonus eligible'));
  a.click('Group');a.click('Cancel group order');a.find(n=>n.type==='button'&&n.props.className==='btn'&&n.props.children==='Cancel group order').props.onClick();assert(a.g().cancelled);assert.equal(a.state[6][0].pts,initial);assert.equal(a.state[6][0].earned,0);assert.equal(a.g().pointsBonus,0);
 });
+
+function personalOrder(a,q=1){
+ a.click('Menu');a.aria('Add '+data.MENU.find(m=>m.id===1).name);
+ for(let i=1;i<q;i++)a.find(n=>n.type==='button'&&n.props.children==='+'&&!n.props['aria-label']).props.onClick();
+ a.click('Add to order · $'+(6.3*q).toFixed(2));a.click('View my order · $'+(6.3*q).toFixed(2));a.click('Submit my order');a.click('Confirm payment method');
+}
+const cardButton=(a,id,method)=>a.find(n=>n.type==='button'&&n.props.className?.startsWith('opt ')&&JSON.stringify(n.props.children).includes('Card ending '+data.SAVED_CARDS[id].find(c=>c.id===method).last4));
+const switchUser=(a,name)=>{a.aria('Switch demo user');a.click(name);};
+
+test('Ben recovers with his alternative card; failure charges nobody and retry charges each person once',()=>{
+ const a=app();a.start();a.choose(5);a.create();a.aria('Add Ben');a.aria('Add Calvin');const initial=a.state[6].map(p=>p.pts);
+ personalOrder(a);switchUser(a,'Ben');a.click('Order');personalOrder(a,2);switchUser(a,'Calvin');a.click('Order');personalOrder(a);
+ switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Status');a.click('Close ordering early');a.click('Close ordering');
+ a.state[7]={...a.g(),failFor:[1]};const originalSend=a.button('Send group order to outlet');a.click('Send group order to outlet');
+ assert(!a.g().sent);assert.equal(a.state[6][1].pmeth,null);assert.equal(a.state[6][1].payFail,1);assert(a.state[6][1].failedMethods.includes('card'));
+ assert(a.button('Send group order to outlet').props.disabled);
+ for(const p of a.state[6].slice(0,3)){assert.equal(p.paidAmt,0);assert.equal(p.paid,0);assert.equal(p.pts,initial[p.id]);}
+ assert.equal(a.state[10].filter(n=>n.t.startsWith('You were charged')).length,0);
+ switchUser(a,'Ben');a.click('Pay');assert(a.text().includes('Card ending 2222'));assert(a.text().includes('Card ending 8018'));a.click('Choose payment method');
+ assert(cardButton(a,1,'card').props.disabled);cardButton(a,1,'card').props.onClick();assert(cardButton(a,1,'backup').props.className.includes('on'));
+ cardButton(a,1,'backup').props.onClick();a.click('Confirm payment method');assert.equal(a.state[6][1].pmeth,'backup');assert.equal(a.state[6][1].payFail,0);assert.equal(a.state[6][1].paidAmt,0);
+ a.click('Pay');a.click('Change payment method');assert(cardButton(a,1,'backup').props.className.includes('on'));a.click('Confirm payment method');
+ switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Status');a.click('Send group order to outlet');assert(a.g().sent);
+ originalSend.props.onClick();assert(a.g().sent);assert.equal(a.state[6][1].payFail,0);
+ const amounts=[6.3,12.6,6.3];for(const p of a.state[6].slice(0,3))assert.equal(p.paidAmt,amounts[p.id]);
+ assert.equal(a.state[6][1].paidMeth,'Card ending 8018');assert.equal(a.state[10].filter(n=>n.t.startsWith('You were charged')).length,3);
+ a.aria('Switch demo user');a.click('Advance order status (outlet)');a.click('Mark as collected');
+ switchUser(a,'Ben');a.click('Pay');assert(a.text().includes('Latest payment'));assert(a.text().includes('Card ending 8018'));assert(a.text().includes('$12.60'));
+ a.state[0]='repeat';a.click('Details');assert(a.text().includes('Card ending 8018'));assert(a.text().includes('You paid$12.60'));assert(!a.text().includes('Card ending 1111'));
+ switchUser(a,'Mary Ng (organiser)');a.click('Order');a.click('Status');a.click('View order history');a.click('Start new order');assert.deepEqual(Array.from(a.state[6][1].failedMethods),[]);assert.equal(a.state[6][1].pmeth,null);assert.equal(a.state[14][0].orders[1].paidMeth,'Card ending 8018');
+});
+
+test('Mary can recover her own decline; exhausting both mock cards stays blocked',()=>{
+ const a=app();a.start();a.choose(5);a.create();personalOrder(a);a.click('Status');a.click('Close ordering early');a.click('Close ordering');
+ a.state[7]={...a.g(),failFor:[0]};a.click('Send group order to outlet');assert(!a.g().sent);assert.equal(a.state[6][0].paidAmt,0);
+ a.click('Pay');a.click('Choose payment method');assert(cardButton(a,0,'card').props.disabled);cardButton(a,0,'backup').props.onClick();a.click('Confirm payment method');
+ a.state[7]={...a.g(),failFor:[0]};a.click('Send group order to outlet');assert(!a.g().sent);assert.equal(a.state[6][0].failedMethods.length,2);
+ a.click('Pay');a.click('Choose payment method');assert(cardButton(a,0,'card').props.disabled);assert(cardButton(a,0,'backup').props.disabled);assert(a.button('Confirm payment method').props.disabled);assert(a.text().includes('Both saved mock cards were declined'));
+ a.button('Confirm payment method').props.onClick();assert.equal(a.state[6][0].pmeth,null);assert.equal(a.state[6][0].paidAmt,0);
+});

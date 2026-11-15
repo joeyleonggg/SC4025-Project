@@ -1,5 +1,5 @@
 import {useState,useEffect,useRef} from 'react';
-import {$,sum,tm,MENU,CATEGORIES,SET_DRINKS,itemPrice,repriceItem,OUTLET_CAPS,QUICK_SLOT_COUNT,slotLabel,makeSlotMs,REWARDS,HIST0,SAVED0,USERS0,DEMO_ORDERS,MAXSIZE,CARD_LAST4,ACCOUNTS} from './data';
+import {$,sum,tm,MENU,CATEGORIES,SET_DRINKS,itemPrice,repriceItem,OUTLET_CAPS,QUICK_SLOT_COUNT,slotLabel,makeSlotMs,REWARDS,HIST0,SAVED0,USERS0,DEMO_ORDERS,MAXSIZE,SAVED_CARDS,ACCOUNTS} from './data';
 import './styles.css';
 
 // NOTE: state is local and mocked. Data comes from ./data.js.
@@ -8,8 +8,9 @@ import './styles.css';
 const pointsFor = (v,bonusPercent=0) => Math.floor(Math.round(v*100)*8*(100+bonusPercent)/10000);
 const TOAST_MS = 1000;   // every pop-up message disappears after 1 second
 // Payment methods a person can pick. Picking one does NOT charge anything; the charge happens when the organiser sends the order.
-const METHODS = ['card'];   // Ya Kun only supports its card payment
-const mName = (id,u) => 'Card ending '+CARD_LAST4[u];
+const methodsFor = id => SAVED_CARDS[id]||[];
+const mName = (id,u) => {const card=methodsFor(u).find(c=>c.id===id);return card?'Card ending '+card.last4:'Choose a saved card';};
+const cardAllowed = (id,p) => methodsFor(p.id).some(c=>c.id===id)&&!(p.failedMethods||[]).includes(id);
 const STAT = {preparing:'Being prepared',ready:'Ready for collection',collected:'Collected'};
 const fdt = ms => new Date(ms).toLocaleDateString([],{weekday:'short',day:'numeric',month:'short',year:'numeric'})+' · '+tm(ms);
 const IC={
@@ -81,7 +82,7 @@ const freeTxt = p => freeOf(p) ? 'Free ' + freeOf(p).free + ' (reward)' : '';
 const lines = p => p.items.map(itemLine).concat(freeOf(p) ? [freeTxt(p)] : []).join(' + ');
 // "Still choosing" only fits someone who already has items; a person who was just added has not started yet.
 const waitText = p => p.items.length ? 'Still choosing' : 'Not ordered yet';
-const blank = p => ({...p,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:null,payFail:0,rw:null,earned:0,left:0,in:p.org?1:0});
+const blank = p => ({...p,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:null,payFail:0,failedMethods:[],rw:null,earned:0,left:0,in:p.org?1:0});
 const submitted = p => p.sub ? {...p,...p.sub} : p;
 const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[],collectionMode:'pickup',advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0,extensionUsed:false,extensionUntil:0,advanceExtensionSlotAt:0,pointsBonus:0};
 // n = how many group orders this session has already finished, so every new group gets its own order id and collection number.
@@ -118,7 +119,7 @@ function App(){
  const [step,setStep]=useState(1);
  const [banners,setBanners]=useState([]);
  const nid=useRef(0), toastT=useRef(null), Pr=useRef(null);
- const collectedGroup=useRef(null);
+ const collectedGroup=useRef(null),sentGroup=useRef(null);
 
  const isOrg=uid===0, draft=P[uid], me=submitted(draft), org=P[0];
  const outlet={n:OUTLET_CAPS[g.oi].n,w:OUTLET_CAPS[g.oi].w,slots:Object.fromEntries(g.slotTimes.map((t,i)=>[t,OUTLET_CAPS[g.oi].caps[i]??OUTLET_CAPS[g.oi].laterCap]))};
@@ -154,7 +155,7 @@ function App(){
  const earners=g.pay==='sponsor'?members.filter(p=>p.org):subm;
  const declined=!!me.payFail&&!g.sent;
  // Nobody is charged until the order is sent. "Ready to pay" just means a payment method has been chosen.
- const needsMethod=p=>g.pay==='individual'&&!!p.sub&&owed(p)>0&&!p.pmeth;
+ const needsMethod=p=>g.pay==='individual'&&!!p.sub&&owed(p)>0&&!cardAllowed(p.pmeth,p);
  const unpaid=subm.filter(needsMethod);
  const bad=p=>p.items.filter(i=>g.sold.includes(i.id)||(g.sold.includes(8)&&/milo|moki/i.test(i.name+' '+(i.o||''))));
  const pending=g.live&&!g.sent&&!g.cancelled;
@@ -207,7 +208,7 @@ function App(){
   pointsRate:8,pointsBonus:bonusPercent,
   payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:orderPoints(groupTotal)}:null,
   members:subm.map(p=>p.n),
-  orders:Object.fromEntries(subm.map(p=>[p.id,{items:p.items.map(i=>({...i})),owed:owed(p),rw:rw(p)?rw(p).t:'',free:freeOf(p)?freeOf(p).free:'',earn:g.status==='collected'?p.earned:earnOf(p)}]))});
+  orders:Object.fromEntries(subm.map(p=>[p.id,{items:p.items.map(i=>({...i})),owed:owed(p),paidAmt:p.paidAmt,paidMeth:p.paidMeth,rw:rw(p)?rw(p).t:'',free:freeOf(p)?freeOf(p).free:'',earn:g.status==='collected'?p.earned:earnOf(p)}]))});
  const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist];
  const myHist=histAll.filter(h=>h.orders[uid]||(uid===0&&(h.pay==='sponsor'||h.members.includes(USERS0[0].n))));
 
@@ -368,6 +369,8 @@ function App(){
   else{setScr('track');say(first?'Order submitted':'Order updated')}
  };
  const send=(at,meth)=>{
+  if(!isOrg||!pending||sentGroup.current===g.gid)return false;
+  sentGroup.current=g.gid;
   // This is also the moment the order can no longer change, so it's when any applied Cherish reward's points cost is actually spent.
   // Payment methods chosen earlier are charged now, and only now.
   const sponsor=g.pay==='sponsor';
@@ -383,9 +386,11 @@ function App(){
   note('Group order submitted. Collect at '+g.slot+', '+outlet.n,'receipt');
   const recipients=sponsor?members.filter(x=>x.sub||x.org):subm;
   recipients.forEach(x=>{const amt=amtOf(x);note(amt>0?'You were charged '+$(amt)+' ('+mName(methOf(x),x.id)+') for '+g.name:sponsor&&!x.org?org.n+' paid for your order.':'Nothing was charged: your order was fully covered.','card',[x.id])});
+  return true;
  };
  // Organiser taps "Send": if a charge would be declined (demo switch), the order is NOT sent and that person is asked for another method.
  const trySend=meth=>{
+  if(sentGroup.current===g.gid)return false;
   const now=Date.now(), reason=sendBlock(now);
   if(reason){setScr('track');say(reason);return false}
   if(g.pay==='sponsor'){
@@ -394,19 +399,19 @@ function App(){
     setErr('Your payment was declined and the order was not sent. Please try again.');
     return false;
    }
-   send(now,meth);return true;
+   return send(now,meth);
   }
   // DEMO: the person(s) chosen under Demo controls have their charge declined at the moment the organiser sends.
   // The order is NOT sent; that person (organiser or colleague) must choose another payment method.
   const v=subm.find(p=>g.failFor.includes(p.id)&&owed(p)>0&&p.pmeth);
   if(v){
    setG(x=>({...x,failFor:x.failFor.filter(i=>i!==v.id)}));
-   upd(v.id,{pmeth:null,payFail:1});
-   if(v.org){note('Your payment was declined. Choose another payment method so you can send the order.','alert',[0]);say('Your payment was declined. Order not sent.',1,2200)}
-   else{note('Your payment was declined. Choose another payment method so the order can be sent.','alert',[v.id]);note('Payment declined for '+v.n+'. The order was not sent.','alert',[0]);say('Payment declined for '+v.n+'. Order not sent.',1,2200)}
+   upd(v.id,{pmeth:null,payFail:1,failedMethods:[...new Set([...(v.failedMethods||[]),v.pmeth])]});
+   if(v.org){note(mName(v.pmeth,v.id)+' was declined. Choose another saved card so you can send the order.','alert',[0]);say('Your payment was declined. Order not sent.',1,2200)}
+   else{note(mName(v.pmeth,v.id)+' was declined. Choose another saved card so the order can be sent.','alert',[v.id]);note('Payment declined for '+v.n+'. The order was not sent.','alert',[0]);say('Payment declined for '+v.n+'. Order not sent.',1,2200)}
    return false;
   }
-  send(now);return true;
+  return send(now);
  };
  const markCollected=()=>{
   if(!isOrg||!g.sent||g.cancelled||g.status!=='ready'||collectedGroup.current===g.gid)return;
@@ -430,11 +435,12 @@ function App(){
    upd(uid,{pmeth:sel,payFail:0});setScr('paid');return;
   }
   if(!pending||!me.in||!me.sub)return;
+  if(!cardAllowed(sel,me))return setErr('Choose a different saved card. The declined card cannot be used for this order.');
   if(me.payFail&&uid!==0)note(me.n+' chose a new payment method. The order can now be sent.','check',[0]);
   upd(uid,{pmeth:sel,payFail:0});
   setScr('track');say('Payment method saved. You will only be charged when the order is sent.');
  };
- const goPay=mode=>{setPm(mode);setSel(me.pmeth||'card');setErr('');setScr('pay')};
+ const goPay=mode=>{setPm(mode);setSel(cardAllowed(me.pmeth,me)?me.pmeth:methodsFor(uid).find(c=>cardAllowed(c.id,me))?.id||'');setErr('');setScr('pay')};
  const othersDone=()=>{
   // DEMO ONLY: real participants act through their own devices.
   const who=members.filter(x=>!x.org&&!x.sub&&DEMO_ORDERS[x.id]);
@@ -625,9 +631,10 @@ function App(){
    <div className="hero" style={{textAlign:'center'}}><div className="mute">{pm==='group'?'Group total':'You will pay when the order is sent'}</div><div className="big">{$(pm==='group'?groupTotal:owed(me))}</div>{pm==='group'&&<div className="mute">One payment covers everyone's order.</div>}<div className="mute" style={{marginTop:6}}>You will earn about <b>{earnOf(me)} Cherish points</b>{pm==='group'?' for the whole group order':''} when the group order is collected.</div></div>
    {err&&<Ban c="e">{err}</Ban>}
    <label className="l" style={{marginTop:0}}>Payment method</label>
-   {METHODS.map(k=><div key={k} className={'opt '+(sel===k?'on':'')} onClick={()=>setSel(k)}><b>{mName(k,uid)}</b>{k==='card'&&<div className="mute">Default payment method</div>}</div>)}
+   {methodsFor(uid).map(({id:k,label})=><button key={k} type="button" className={'opt '+(sel===k?'on':'')+(!cardAllowed(k,me)?' dis':'')} style={{width:'100%',textAlign:'left',font:'inherit'}} disabled={!cardAllowed(k,me)} onClick={()=>{if(cardAllowed(k,me)){setSel(k);setErr('')}}}><b>{mName(k,uid)}</b><div className="mute">{cardAllowed(k,me)?label:'Declined for this order — choose another saved card'}</div></button>)}
+   {!methodsFor(uid).some(c=>cardAllowed(c.id,me))&&<Ban c="e">Both saved mock cards were declined. Reset the demo to try again.</Ban>}
    <div className="mute" style={{margin:'6px 0 12px'}}>{pm==='group'?'You are charged when you send the order to the outlet.':(isOrg?"You won't be charged until you send the order.":"You won't be charged until the organiser sends the order.")}</div>
-   <button className="btn" onClick={()=>pm==='group'?(err?doPay():setSheet({k:'confirmPay'})):doPay()}>{pm==='group'?(err?'Try again':'Review and pay '+$(groupTotal)):'Confirm payment method'}</button>
+   <button className="btn" disabled={!cardAllowed(sel,me)} onClick={()=>pm==='group'?(err?doPay():setSheet({k:'confirmPay'})):doPay()}>{pm==='group'?(err?'Try again':'Review and pay '+$(groupTotal)):'Confirm payment method'}</button>
   </>}
 
   {screen==='paid'&&receipt&&<>
@@ -709,7 +716,7 @@ function App(){
     {g.pay==='individual'&&me.sub&&!g.sent&&owed(me)>0&&<button className={'btn'+(me.pmeth?' ghost':'')} style={{marginTop:12}} onClick={()=>goPay('me')}>{me.pmeth?'Change payment method':'Choose payment method'}</button>}
     {g.pay==='sponsor'&&isOrg&&!g.sent&&<><button className="btn" style={{marginTop:12}} disabled={!canSend} onClick={()=>goPay('group')}>Pay {$(groupTotal)} and send to outlet</button>{!canSend&&<div className="mute" style={{marginTop:8}}>{why}</div>}</>}</div>}
    <div className="h3">Payment methods</div>
-   {METHODS.map(k=><div key={k} className={'opt static'+((me.pmeth||'card')===k?' on':'')}><b>{mName(k,uid)}</b>{k==='card'&&<div className="mute">Default payment method</div>}</div>)}
+   {methodsFor(uid).map(({id:k,label})=><div key={k} className={'opt static'+(me.pmeth===k?' on':'')}><b>{mName(k,uid)}</b><div className="mute">{label}{(me.failedMethods||[]).includes(k)?' · declined for this order':''}{me.pmeth===k?' · selected for this order':''}</div></div>)}
    {g.sent&&me.in&&!!me.paid&&me.paidAmt>0&&<><div className="h3">Latest payment</div><div className="card"><div className="row"><Icon n="receipt"/><div className="sp"><b>{$(me.paidAmt)}</b><div className="mute">{fdt(g.sentAt)}<br/>{me.paidMeth}</div></div><Tag c="ok">Paid</Tag></div><div className="mute" style={{marginTop:10}}>{(g.pay==='sponsor'?subm.flatMap(p=>p.items):me.items).map(i=>i.name+(i.q>1?' ×'+i.q:'')).join(', ')}</div></div></>}
   </>}
 
@@ -767,6 +774,7 @@ function App(){
     </>:<div className="mute">You didn't submit an order in this group.</div>}
     {(m||payer)&&<>
      <div className="row" style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--line)'}}><b className="sp">{sponsor&&!isOrg?'Paid by '+USERS0[0].n:'You paid'}</b><b>{$(payer?(h.payer?.amount??h.total):sponsor?0:m.owed)}</b></div>
+     {!sponsor&&m?.paidMeth&&<div className="mute" style={{marginTop:4}}>{m.paidMeth}</div>}
      {payer&&h.payer?.method&&<div className="mute">{h.payer.method}</div>}
      <div className="mute" style={{marginTop:4}}>{sponsor&&!isOrg?USERS0[0].n+' earned the points for this order':(payer?(h.payer?.earn??pointsFor(h.total)):m.earn)+' Cherish points earned'}</div>
     </>}

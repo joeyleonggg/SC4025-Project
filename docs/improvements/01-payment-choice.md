@@ -8,7 +8,7 @@ The latest report, FR-05, Table 4.3 and Section 4.4, limits the MVP to individua
 
 - New group creation shows an explanation that everyone pays for their own order, with no sponsorship selector.
 - Creation enforces individual payment, including groups started from saved groups and reorders.
-- Each participant selects their own saved mock card. Choosing it does not charge anything.
+- Each participant selects one of their own two saved mock cards. Choosing it does not charge anything. See [saved cards and decline recovery](07-payment-recovery.md).
 - Sending charges each participant only their submitted total after their own reward. A missing payment method or a declined payment blocks sending.
 - The organiser sends the consolidated order without paying the other participants' totals.
 - Historical sponsored receipts retain their original payer and amounts. Compatibility code for those records remains in the app.

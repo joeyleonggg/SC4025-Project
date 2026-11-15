@@ -200,11 +200,16 @@ export const REWARDS = [
  {id:'r2',t:'Free kopi',cost:150,min:3,val:0,free:'Kopi'}   /* adds a free kopi; no price deduction */,
  {id:'r3',t:'$5 off',cost:500,min:10,val:5}];
 // pmeth = payment method the person selected (nothing is charged yet). paid/paidAmt/paidMeth are only set when the organiser sends the order.
-const U = (id,n,pts,org) => ({id,n,pts,org,in:org?1:0,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:null,rw:null,earned:0,left:0,hist:[]});
+const U = (id,n,pts,org) => ({id,n,pts,org,in:org?1:0,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:null,failedMethods:[],rw:null,earned:0,left:0,hist:[]});
 export const USERS0 = [U(0,'Mary Ng',340,1),U(1,'Ben',260),U(2,'Calvin',90),U(3,'Dylan',520),U(4,'Eve',150),
  U(5,'Farah',410),U(6,'Gareth',75),U(7,'Hui Min',230),U(8,'Irfan',600),U(9,'Jia Wei',180)];
 // Demo "card on file" per person, purely cosmetic for the prototype.
 export const CARD_LAST4 = {0:'1111',1:'2222',2:'3333',3:'4444',4:'5555',5:'6666',6:'7777',7:'8888',8:'9999',9:'1212'};
+// Two saved mock cards per demo account. No real card details or transactions.
+export const SAVED_CARDS = Object.fromEntries(Object.entries(CARD_LAST4).map(([id,last4])=>[id,[
+ {id:'card',last4,label:'Default saved card'},
+ {id:'backup',last4:String(8008+Number(id)*10),label:'Alternative saved card'}
+]]));
 // Demo Cherish accounts, so the login screen has something real to check against.
 export const ACCOUNTS = USERS0.map(u => ({id:u.id, identifier:u.n.toLowerCase().replace(/\s+/g,'')+'@yakun.demo', password:'kaya1234'}));
 

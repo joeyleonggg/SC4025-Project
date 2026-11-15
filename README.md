@@ -79,3 +79,11 @@ Qualifying advance orders earn 10% extra points on each person's actual payment 
 The cart and payment screen explain eligibility before submission. The applied bonus is fixed when the organiser sends, preserved through the approved extension exception, and credited once at collection. History records the bonus and personal award. Cancelling earns no points.
 
 See [the formula, eligibility and test steps](docs/improvements/06-advance-points.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.
+
+## Saved cards and declined payments
+
+Each demo account has two saved mock cards. If sending is declined, nobody is charged. The affected person confirms their alternative card, then the organiser retries. Declined cards remain unavailable for that order.
+
+Successful sending charges each person's own total once. Personal receipts and history retain the selected card. Mary has cards ending 1111 and 8008; Ben has 2222 and 8018. All cards and charges are simulated.
+
+See [the payment recovery guide and test steps](docs/improvements/07-payment-recovery.md). From `frontend`, rerun `npm run test:collection` and `npm run build`.

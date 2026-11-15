@@ -118,7 +118,9 @@ Award 10% extra points for qualifying advance orders. Preserve the bonus during 
 
 ### A08 Multiple mock cards and decline recovery
 
-**Status** Pending; depends on A03.
+**Status** Complete. Delivery commit: `Add saved mock cards and declined payment recovery`.
+
+**Verification** Production build and all fourteen automated checks passed. Payment checks cover default-card decline, no partial charges, unavailable declined cards, alternative-card selection and retention, three personal charges on successful retry, duplicate-send prevention, personal receipt/history, new-group reset, organiser recovery and both cards declining.
 
 **Requirement** FR-05 and US-06–US-07.
 
@@ -223,4 +225,4 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 
 For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-The next implementation item is A08, multiple mock cards and decline recovery. Unresolved policy details remain recorded above for discussion.
+The next implementation item is A09, payment status privacy. Unresolved policy details remain recorded above for discussion.
