@@ -55,3 +55,13 @@ Points are credited only when the organiser marks the order collected. New recei
 This follows FR-06 and US-08 in the latest report and supersedes the earlier group-size multiplier. The separate advance-order bonus is pending A07.
 
 See [the points calculation and test steps](docs/improvements/02-group-points.md).
+
+## Pickup and advance orders
+
+Choose **Pickup** for ASAP, three quick times and the later-time dropdown, or **Advance order** for later collection with at least two hours of preparation time. Choices account for the ordering window. ASAP means approximately 15–20 minutes after ordering closes.
+
+Pickup requires at least 15 minutes from sending; advance orders normally require at least two hours. The app validates creation, replacement and sending against the timing and mock capacity rules. Next-day choices show Singapore dates, and sending locks the mode, outlet and collection time. History retains the chosen mode and time.
+
+The agreed deadline-extension exception is pending A06, and the advance-order points bonus is pending A07. Outlet opening hours are not modelled. The scheduling horizon remains 24 hours.
+
+See [collection rules and manual test steps](docs/improvements/04-pickup-times.md). From `frontend`, rerun the automated collection checks with `npm run test:collection` and build with `npm run build`.

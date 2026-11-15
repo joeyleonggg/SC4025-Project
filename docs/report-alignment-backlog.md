@@ -76,7 +76,9 @@ Remove the group-membership multiplier from new-order estimates and crediting. U
 
 ### A05 Pickup and advance-order modes
 
-**Status** Pending.
+**Status** Complete. Delivery commit: `Add pickup and advance collection modes`.
+
+**Verification** Production build and six automated collection checks passed. Browser review confirmed the mode controls and advance availability. Checks cover preparation time, stale choices, capacity replacement, send-time boundaries, next-day labels, locking and archived mode/qualification.
 
 **Requirement** FR-07, US-01 and US-09.
 
@@ -84,7 +86,7 @@ Make pickup versus advance ordering explicit. Keep the agreed quick choices and 
 
 **Acceptance checks** Users can identify the chosen mode. Invalid initial advance choices are unavailable. A full slot requires a valid replacement. Both same-day and next-day selections appear correctly in details and history. Sending locks the outlet and collection time.
 
-**Decision to record** Define the normal qualification reference time and store the original advance qualification needed by A06. The report describes selection and placement using different wording. Replacing an advance slot should trigger fresh validation for that replacement.
+**Recorded interpretation** Normal qualification uses the send time, when the outlet receives the order. Creation and replacement reserve the required lead time beyond the planned ordering deadline; sending validates current time again. Advance qualification records its creation/replacement time, planned deadline and collection timestamp for A06. A new replacement must qualify afresh. ASAP includes the ordering window plus 15–20 minutes preparation. The extension exception remains A06; the report wording difference stays recorded for group discussion.
 
 ### A06 Deadline extension exception
 
@@ -217,4 +219,4 @@ Capture final screens and write their explanations for Section 4.5. Prepare and 
 
 For each work item, confirm its specific behaviour, implement the smallest complete change, run relevant checks, update its documentation and provide manual review steps. After Yi Xiang reviews it, commit and push that item with a descriptive message. Update this checklist with its status and commit. Keep pending items separate from the item being pushed.
 
-The next implementation item is A05, pickup and advance-order modes. Unresolved policy details remain recorded above for discussion.
+The next implementation item is A06, deadline extension exception. Unresolved policy details remain recorded above for discussion.

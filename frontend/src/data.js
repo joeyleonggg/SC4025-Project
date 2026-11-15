@@ -182,10 +182,11 @@ export const makeSlotMs = (base = Date.now()) => {
  return SLOT_OFFSETS_MIN.map(m=>rounded+m*60000).filter(ms=>ms<=base+24*60*60000);
 };
 export const slotLabel = (ms,index) => {
- if(index===0)return 'ASAP (~'+tm(ms)+')';
- if(index<QUICK_SLOT_COUNT)return tm(ms);
- const day=new Date(ms).toLocaleDateString('en-SG',{timeZone:'Asia/Singapore',weekday:'short',day:'numeric',month:'short'});
- return day+' · '+tm(ms);
+ const dateFormat={timeZone:'Asia/Singapore',weekday:'short',day:'numeric',month:'short'};
+ const day=new Date(ms).toLocaleDateString('en-SG',dateFormat);
+ const today=new Date().toLocaleDateString('en-SG',dateFormat);
+ const time=index<QUICK_SLOT_COUNT&&day===today?tm(ms):day+' · '+tm(ms);
+ return index===0?'ASAP (~'+time+')':time;
 };
 export const makeSlotTimes = (base = Date.now()) => makeSlotMs(base).map(slotLabel);
 // Capacity per outlet, one number per slot above (largest group size that slot can still take).

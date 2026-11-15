@@ -41,13 +41,13 @@ const MenuImage = ({item}) => {
  const {src,x,y,size}=item.photo;
  return <span className="menu-photo"><img src={src} alt={item.name} loading="lazy" style={{width:(588/size*100)+'%',left:-(x/size*100)+'%',top:-(y/size*100)+'%'}}/></span>;
 };
-function PickupChoices({times,selected,available,onPick,id}){
+function PickupChoices({times,selected,available,onPick,id,mode='pickup'}){
  const later=times.slice(QUICK_SLOT_COUNT);
  return <>
-  <div className="chips">{times.slice(0,QUICK_SLOT_COUNT).map(t=><button key={t} disabled={!available(t)} className={'chip '+(selected===t&&available(t)?'on':'')} onClick={()=>onPick(t)}>{t}</button>)}</div>
+  {mode==='pickup'&&<div className="chips">{times.slice(0,QUICK_SLOT_COUNT).map(t=><button key={t} disabled={!available(t)} className={'chip '+(selected===t&&available(t)?'on':'')} onClick={()=>onPick(t)}>{t}</button>)}</div>}
   <label className="l" htmlFor={id}>Choose a later time</label>
   <select id={id} className="menu-select" value={later.includes(selected)?selected:''} onChange={e=>onPick(e.target.value)}>
-   <option value="" disabled>Select a later pickup time</option>
+   <option value="" disabled>Select a later collection time</option>
    {later.map(t=><option key={t} value={t} disabled={!available(t)}>{t}{available(t)?'':' (unavailable)'}</option>)}
   </select>
  </>;
@@ -83,9 +83,14 @@ const lines = p => p.items.map(itemLine).concat(freeOf(p) ? [freeTxt(p)] : []).j
 const waitText = p => p.items.length ? 'Still choosing' : 'Not ordered yet';
 const blank = p => ({...p,items:[],sub:null,paid:0,paidAmt:0,paidMeth:'',pmeth:null,payFail:0,rw:null,earned:0,left:0,in:p.org?1:0});
 const submitted = p => p.sub ? {...p,...p.sub} : p;
-const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[]};
+const G0 = {gid:'YT1024',coll:'C-042',sentAt:0,name:'Marketing Breakfast',win:10,deadline:'',deadlineAt:0,oi:0,slot:'',slotTimes:[],size:5,pay:'individual',live:false,closed:false,expired:false,cancelled:false,reminded:false,sent:false,status:'',inv:'valid',failFor:[],sold:[],slotGone:false,slotMs:[],collectionMode:'pickup',advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0};
 // n = how many group orders this session has already finished, so every new group gets its own order id and collection number.
-const slotSet = () => { const ms = makeSlotMs(); return {slotMs: ms, slotTimes: ms.map(slotLabel)}; };
+const slotSet = (win=10) => {
+ const now=Date.now(),ms=makeSlotMs(now);
+ // ASAP includes the ordering window and at least 15 minutes for preparation.
+ ms[0]=Math.ceil((now+win*60000)/300000)*300000+15*60000;
+ return {slotMs:ms,slotTimes:ms.map(slotLabel)};
+};
 const freshG = (n=0) => ({...G0, gid:'YT'+(1024+n), coll:'C-'+String(42+n).padStart(3,'0'), ...slotSet()});
 
 function App(){
@@ -119,7 +124,12 @@ function App(){
  const timeOfSlot=t=>g.slotMs[g.slotTimes.indexOf(t)]||0;
  const slotAt=timeOfSlot(g.slot);
  const slotFits=t=>outlet.slots[t]>=g.size&&!(g.slotGone&&t===g.slot);
- const slotAvailable=(t,now)=>slotFits(t)&&timeOfSlot(t)>Math.max(now,g.deadlineAt);
+ const leadMinutes=g.collectionMode==='advance'?120:15;
+ const collectionName=g.collectionMode==='advance'?'Advance order':'Pickup';
+ const slotAvailable=(t,now,planned=false)=>{
+  const reference=planned?Math.max(now,g.live?g.deadlineAt:now+g.win*60000):now;
+  return slotFits(t)&&timeOfSlot(t)>=reference+leadMinutes*60000;
+ };
  Pr.current=P;
  const members=P.filter(p=>p.in).map(submitted), subm=members.filter(p=>p.sub);
  const pointsInfo='8 Cherish points per $1 paid after rewards, rounded down to whole points';
@@ -150,7 +160,7 @@ function App(){
   if(!isOrg||!pending)return 'There is no group order to send.';
   if(!g.closed)return 'Close ordering first.';
   if(!subm.length)return 'No orders have been submitted.';
-  if(!slotAvailable(g.slot,now))return 'Choose an available future pickup time that fits your group size.';
+  if(!slotAvailable(g.slot,now))return 'Choose an available '+collectionName.toLowerCase()+' time at least '+leadMinutes+' minutes ahead that fits your group size.';
   if(unavailable.length)return 'Unavailable items in submitted orders for '+unavailable.map(p=>p.n).join(', ')+'. Extend ordering so they can update their orders.';
   if(unpaid.length)return unpaid.length+' payment method(s) still to be chosen.';
   return '';
@@ -162,6 +172,7 @@ function App(){
   {withMembers&&<><span>Members</span><b>{members.map(p=>p.n).join(', ')}</b></>}
   {!withMembers&&isOrg&&<><span>Submitted</span><b>{subm.length} of {members.length}</b></>}
   <span>Outlet</span><b>{outlet.n}</b>
+  <span>Collection mode</span><b>{collectionName}</b>
   <span>Collection</span><b>{g.slot}{g.sent&&' (locked)'}</b>
   <span>Payment</span><b>{g.pay==='sponsor'?org.n+' pays for everyone':'Everyone pays for their own order'}</b>
   <span>Points rate</span><b>8 points per $1 paid</b>
@@ -181,6 +192,7 @@ function App(){
  const meth=mName(me.pmeth||'card',uid);
  // Order history: the current group appears as soon as it is sent (so it is never lost), older ones are archived below it.
  const snapshot=()=>({s:1,id:g.gid,name:g.name,at:g.sentAt||Date.now(),outlet:outlet.n,slot:g.slot,coll:g.coll,status:g.status||'preparing',pay:g.pay,total:groupTotal,
+  collectionMode:g.collectionMode,advanceQualified:g.advanceQualified,advanceQualifiedAt:g.advanceQualifiedAt,advanceDeadlineAt:g.advanceDeadlineAt,advanceSlotAt:g.advanceSlotAt,
   pointsRate:8,
   payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:pointsFor(groupTotal)}:null,
   members:subm.map(p=>p.n),
@@ -211,11 +223,21 @@ function App(){
   if(id)say(REWARDS.find(r=>r.id===id).t+' applied');
  };
  const setSize=n=>{const min=Math.max(2,preset.length);if(n>MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`);n=MAXSIZE}if(n<min&&preset.length>2)say(`${preset.length} people are in this saved group`);setG(x=>({...x,size:Math.max(min,n)}))};
- const setOutlet=i=>setG(x=>{const idx=x.slotTimes.indexOf(x.slot),ok=idx>=0&&(OUTLET_CAPS[i].caps[idx]??OUTLET_CAPS[i].laterCap)>=x.size;return {...x,oi:i,slot:ok?x.slot:''}});
+ const setOutlet=i=>{
+  if(!isOrg||g.sent||g.cancelled)return;
+  setG(x=>{const idx=x.slotTimes.indexOf(x.slot),ok=idx>=0&&(OUTLET_CAPS[i].caps[idx]??OUTLET_CAPS[i].laterCap)>=x.size;return {...x,oi:i,slot:ok?x.slot:'',...(ok?{}:{advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0})}});
+ };
+ const setCollectionMode=mode=>{
+  if(!isOrg||g.sent||g.cancelled||mode===g.collectionMode)return;
+  setG(x=>({...x,collectionMode:mode,...slotSet(x.win),slot:'',slotGone:false,advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0}));
+ };
+ const collectionModes=<><label className="l">Collection option</label><div className="chips">{[['pickup','Pickup'],['advance','Advance order']].map(([mode,label])=><button key={mode} className={'chip '+(g.collectionMode===mode?'on':'')} onClick={()=>setCollectionMode(mode)}>{label}</button>)}</div><div className="mute" style={{marginTop:8}}>{g.collectionMode==='advance'?'Choose collection at least two hours after the planned ordering deadline.':'Allow at least 15 minutes after sending for preparation. ASAP includes the ordering window.'}</div></>;
  const chooseSlot=t=>{
-  if(!isOrg||g.sent||g.cancelled||!slotAvailable(t,Date.now()+(g.live?0:5*60000)))return;
-  setG(x=>({...x,slot:t,slotGone:false}));
-  if(g.live)note('Pickup time changed to '+t,'clock');
+  const now=Date.now();
+  if(!isOrg||g.sent||g.cancelled||!slotAvailable(t,now,true))return;
+  const qualified=g.live&&g.collectionMode==='advance';
+  setG(x=>({...x,slot:t,slotGone:false,advanceQualified:qualified,advanceQualifiedAt:qualified?now:0,advanceDeadlineAt:qualified?Math.max(now,g.deadlineAt):0,advanceSlotAt:qualified?timeOfSlot(t):0}));
+  if(g.live)note(collectionName+' time changed to '+t,'clock');
  };
 
 
@@ -229,11 +251,11 @@ function App(){
  const createGroup=()=>{
   if(!isOrg||g.live)return;
   const now=Date.now(), at=now+g.win*60000;
-  if(!slotFits(g.slot)||now+5*60000>=slotAt){
-   setG(x=>({...x,...slotSet(),slot:''}));setStep(2);return say('Choose a later pickup time');
+  if(!slotAvailable(g.slot,now,true)){
+   setG(x=>({...x,...slotSet(x.win),slot:'',advanceQualified:false}));setStep(2);return say('Choose a later pickup time');
   }
   if(at>=slotAt)return say('Choose a shorter ordering time or a later pickup');
-  setG(x=>({...x,pay:'individual',live:true,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
+  setG(x=>({...x,pay:'individual',live:true,advanceQualified:x.collectionMode==='advance',advanceQualifiedAt:x.collectionMode==='advance'?now:0,advanceDeadlineAt:x.collectionMode==='advance'?at:0,advanceSlotAt:x.collectionMode==='advance'?slotAt:0,deadlineAt:at,deadline:tm(at),reminded:false,closed:false,expired:false,cancelled:false}));
   const inv=P.filter(x=>!x.org&&preset.includes(x.n)).slice(0,g.size-1).map(x=>x.id); // only the saved group's members; a new team starts with just the organiser
   setP(p=>p.map(x=>inv.includes(x.id)?{...x,in:1}:x));
   if(inv.length){note('Invitations sent for '+g.name,'mail',[0]);note(org.n+' invited you to '+g.name,'mail',inv);}
@@ -470,37 +492,38 @@ function App(){
     <label className="l">Group name</label><input value={g.name} onChange={e=>setG({...g,name:e.target.value})}/>
     <label className="l">How many people?</label>
     <div className="stepper"><button onClick={()=>setSize(g.size-1)} aria-label="Fewer people">−</button><div><b>{g.size}</b><div className="mute">people, up to {MAXSIZE}</div></div><button onClick={()=>setSize(g.size+1)} aria-label="More people">+</button></div>
-    <div className="sticky"><button className="btn" disabled={!g.name.trim()} onClick={()=>{setG(x=>({...x,...slotSet()}));setStep(2)}}>Next: choose pickup</button></div>
+    <div className="sticky"><button className="btn" disabled={!g.name.trim()} onClick={()=>{setG(x=>({...x,...slotSet(x.win),slot:''}));setStep(2)}}>Next: choose pickup</button></div>
    </>}
    {step===2&&<>
-    <h2 className="ttl">Choose pickup</h2>
+    <h2 className="ttl">Choose collection</h2>
+    {collectionModes}
     <div className="mute">Pick the time first, so you know it is available for {g.size} people.</div>
     <label className="l">Outlet</label>
     {OUTLET_CAPS.map((o,i)=><div key={i} className={'opt '+(g.oi===i?'on':'')} onClick={()=>setOutlet(i)}><b>{o.n}</b><div className="mute">Estimated wait {o.w}</div></div>)}
-    <label className="l">Pickup time</label>
-    <div className="mute" style={{marginBottom:8}}>ASAP is about 15–20 minutes. Choose a quick time below or use the dropdown for later pickup, up to 24 hours ahead.</div>
-    <PickupChoices times={g.slotTimes} selected={g.slot} available={t=>slotAvailable(t,Date.now()+5*60000)} onPick={chooseSlot} id="create-pickup"/>
+    <label className="l">Collection time</label>
+    <div className="mute" style={{marginBottom:8}}>{g.collectionMode==='advance'?'Choose a later collection time, up to 24 hours ahead.':'ASAP is about 15–20 minutes after ordering closes. Choose a quick time or use the dropdown for later pickup, up to 24 hours ahead.'}</div>
+    <PickupChoices times={g.slotTimes} selected={g.slot} mode={g.collectionMode} available={t=>slotAvailable(t,Date.now(),true)} onPick={chooseSlot} id="create-pickup"/>
     <div className="mute" style={{marginTop:10}}>Crossed-out times are full for {g.size} people or too soon. Try another time, outlet or group size.</div>
     <div className="sticky"><button className="btn" disabled={!g.slot} onClick={()=>{
      const now=Date.now();
-     if(!slotAvailable(g.slot,now+5*60000)){
-      setG(x=>({...x,...slotSet(),slot:''}));return say('Choose a later pickup time');
+     if(!slotAvailable(g.slot,now,true)){
+      setG(x=>({...x,...slotSet(x.win),slot:'',advanceQualified:false}));return say('Choose a later pickup time');
      }
-     const win=[30,15,10,5].find(m=>m<=g.win&&now+m*60000<slotAt);
+     const win=[30,15,10,5].find(m=>m<=g.win&&now+(m+leadMinutes)*60000<=slotAt);
      setG(x=>({...x,win}));setStep(3);
     }}>Next: ordering time</button></div>
    </>}
    {step===3&&<>
     <h2 className="ttl">Ordering time and payment</h2>
     <label className="l">How long can people order?</label>
-    <div className="chips">{[5,10,15,30].map(m=>{const late=Date.now()+m*60000>=slotAt;return <button key={m} disabled={late} className={'chip '+(g.win===m&&!late?'on':'')} onClick={()=>setG({...g,win:m})}>{m} minutes</button>})}</div>
+    <div className="chips">{[5,10,15,30].map(m=>{const late=Date.now()+(m+leadMinutes)*60000>slotAt;return <button key={m} disabled={late} className={'chip '+(g.win===m&&!late?'on':'')} onClick={()=>setG({...g,win:m})}>{m} minutes</button>})}</div>
     <div className="mute" style={{marginTop:10}}>Ordering closes at {tm(Date.now()+g.win*60000)}. Everyone sees a countdown and gets a reminder.</div>
     <label className="l">Payment</label>
     <div className="card"><b>Everyone pays for their own order</b><div className="mute" style={{marginTop:6}}>Each person chooses their own saved card. Cards are charged only when the organiser sends the group order to the outlet.</div></div>
     <div className="sticky"><button className="btn" onClick={createGroup}>Create group</button></div>
    </>}
    {step===4&&<>
-    <div className="hero" style={{textAlign:'center'}}><Icon n="check" s={44}/><h2 style={{marginTop:10}}>Your group is ready</h2><div className="mute">{g.name}<br/>Pickup {g.slot} · ordering closes {g.deadline}</div></div>
+    <div className="hero" style={{textAlign:'center'}}><Icon n="check" s={44}/><h2 style={{marginTop:10}}>Your group is ready</h2><div className="mute">{g.name}<br/>{collectionName} · {g.slot} · ordering closes {g.deadline}</div></div>
     <div className="card row"><div className="sp mute" style={{wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div><button className="btn sm" onClick={copyLink}>Copy link</button></div>
     <div className="mute">Share the link so friends can join.</div>
     <div className="sticky"><button className="btn" onClick={()=>setScr('menu')}>Begin my order</button><button className="btn ghost" style={{marginTop:10}} onClick={()=>setScr('group')}>View group</button></div>
@@ -516,7 +539,7 @@ function App(){
 
   {screen==='join'&&<>
    <div className="hero"><h2>{invState==='valid'?org.n+' invited you to '+g.name:"This invitation can't be used"}</h2>
-    {invState==='valid'&&g.live&&<p className="mute">Deadline {g.deadline} · {outlet.n} · collect at {g.slot}<br/>{g.pay==='sponsor'?org.n+' is paying for everyone':'Everyone pays for their own order'}</p>}</div>
+    {invState==='valid'&&g.live&&<p className="mute">Deadline {g.deadline} · {collectionName} · {outlet.n} · collect at {g.slot}<br/>{g.pay==='sponsor'?org.n+' is paying for everyone':'Everyone pays for their own order'}</p>}</div>
    {!!me.left&&<Ban>You left this group.</Ban>}
    {invState==='expired'&&<Ban c="e">This invitation link is invalid or has expired. Ask {org.n} for a new link.</Ban>}
    {invState==='full'&&<Ban c="e">This group is full ({members.length}/{g.size}). Ask {org.n} to raise the group size.</Ban>}
@@ -620,7 +643,7 @@ function App(){
   </>)}
 
   {screen==='done'&&(!g.sent?<div className="card mute">The group order hasn't been sent to the outlet yet.</div>:<>
-   <div className="hero" style={{textAlign:'center'}}><div className="mute">Group order</div><div className="big">#{g.gid}</div><div className="mute">Collection number <b>{g.coll}</b><br/>{outlet.n} · {g.slot} · about {outlet.w} preparation</div></div>
+   <div className="hero" style={{textAlign:'center'}}><div className="mute">Group order</div><div className="big">#{g.gid}</div><div className="mute">Collection number <b>{g.coll}</b><br/>{collectionName} · {outlet.n}<br/>{g.slot} (locked) · about {outlet.w} preparation</div></div>
    {g.status==='ready'&&<Ban c="k">{isOrg?'Ready to collect. Tap below once you have it.':'The group order is ready. '+org.n+' will collect it.'}</Ban>}
    {g.status==='collected'&&<Ban c="k">Collected — Cherish points have been credited{g.pay==='sponsor'?' to '+org.n+', who paid for the group order.':' to everyone who submitted.'}</Ban>}
    <div className="card"><div className="tl">
@@ -701,18 +724,20 @@ function App(){
     <button className="btn sp" onClick={addToCart}>Add to order · {$(itemPrice(sheet.m,sheet.drink)*sheet.q)}</button></div></>}
    {sheet.k==='rewards'&&<><b style={{fontSize:18}}>Your Cherish rewards</b><div className="mute" style={{marginBottom:10}}>Rewards apply only to your own items.</div>
     {REWARDS.map(r=>{const okp=me.pts>=r.cost,okm=sum(draft.items)>=r.min;return <div key={r.id} className={'opt '+(okp?'':'dis')} onClick={()=>{if(!okp)return;if(!okm){say('Spend '+$(r.min)+' or more to use '+r.t,1);return}setReward(r.id)}}><div className="row"><b className="sp">{r.t}</b>{okp&&<Tag c="ok">Eligible</Tag>}</div><div className="mute">{r.free?'Adds one free '+r.free+' · ':''}{r.cost} points{okp&&!okm?' · add '+$(r.min-sum(draft.items))+' more to your order to use it':''}</div></div>})}</>}
-   {sheet.k==='slot'&&<><b style={{fontSize:20}}>Pickup time and group size</b>
+   {sheet.k==='slot'&&isOrg&&pending&&<><b style={{fontSize:20}}>Collection time and group size</b>
     <div className="mute" style={{margin:'6px 0 4px'}}>A smaller group can open up more pickup times.</div>
-    <div className="mute">Choose a quick pickup or use the dropdown for a later time, up to 24 hours ahead.</div>
+    {collectionModes}
+    <div className="mute">Choose an available collection time, up to 24 hours ahead.</div>
     <label className="l">Group size</label>
     <div className="stepper"><button disabled={g.size<=Math.max(2,members.length)} onClick={()=>setG(x=>({...x,size:Math.max(2,members.length,x.size-1)}))} aria-label="Fewer people">−</button><div><b>{g.size}</b><div className="mute">people</div></div><button disabled={g.size>=MAXSIZE} onClick={()=>setG(x=>{if(x.size>=MAXSIZE){say(`A group order can have at most ${MAXSIZE} people`,1,1500);return x}return {...x,size:x.size+1}})} aria-label="More people">+</button></div>
-    <label className="l">Pickup time</label>
-    <PickupChoices times={g.slotTimes} selected={g.slot} available={t=>slotAvailable(t,Date.now())} onPick={chooseSlot} id="change-pickup"/>
-    {!slotAvailable(g.slot,Date.now())&&<Ban c="e"><span style={{display:'block',marginTop:14}}>Pick an available future time that fits {g.size} people.</span></Ban>}
-    {!g.slotTimes.some(t=>timeOfSlot(t)>Math.max(Date.now(),g.deadlineAt))&&<button className="btn ghost sm" onClick={()=>setG(x=>({...x,...slotSet(),slot:'',slotGone:false}))}>Show new pickup times</button>}
+    <label className="l">Collection time</label>
+    <PickupChoices times={g.slotTimes} selected={g.slot} mode={g.collectionMode} available={t=>slotAvailable(t,Date.now(),true)} onPick={chooseSlot} id="change-pickup"/>
+    {!slotAvailable(g.slot,Date.now(),true)&&<Ban c="e"><span style={{display:'block',marginTop:14}}>Pick an available future time that fits {g.size} people.</span></Ban>}
+    {!g.slotTimes.some(t=>slotAvailable(t,Date.now(),true))&&<button className="btn ghost sm" onClick={()=>setG(x=>({...x,...slotSet(x.win),slot:'',slotGone:false,advanceQualified:false,advanceQualifiedAt:0,advanceDeadlineAt:0,advanceSlotAt:0}))}>Show new pickup times</button>}
     <button className="btn" style={{marginTop:22}} onClick={()=>setSheet(null)}>Done</button></>}
    {sheet.k==='hist'&&(()=>{const h=sheet.h,m=h.orders[uid],sponsor=h.pay==='sponsor',payer=sponsor&&isOrg;return <><b style={{fontSize:18}}>{h.name}</b>
     <div className="mute">#{h.id} · {fdt(h.at)}</div>
+    {h.collectionMode&&<div className="mute">{h.collectionMode==='advance'?'Advance order':'Pickup'}</div>}
     <div className="mute">{h.outlet} · pickup {h.slot}{h.coll?' · collection '+h.coll:''}</div>
     <div className="mute">{STAT[h.status]} · {h.pay==='sponsor'?'Organiser paid for everyone':'Everyone paid for their own order'}</div>
     {h.pointsRate!=null&&<div className="mute">{h.pointsRate} Cherish points per $1 paid</div>}
@@ -730,7 +755,7 @@ function App(){
    {sheet.k==='invite'&&<><div className="row"><Icon n="check" s={26}/><b style={{fontSize:18}}>Invite link copied</b></div>
     <div className="card mute" style={{marginTop:12,wordBreak:'break-all'}}>yakun.app/together/{g.gid}</div>
     <div className="h3" style={{marginTop:4}}>Group order right now</div>
-    <div className="card"><b>{g.name}</b><div className="mute" style={{margin:'4px 0 8px'}}>Organiser {org.n} · Deadline {g.deadline}<br/>{outlet.n} · collect at {g.slot}<br/>{g.pay==='sponsor'?org.n+' is paying for everyone':'Everyone pays for their own order'}</div>
+    <div className="card"><b>{g.name}</b><div className="mute" style={{margin:'4px 0 8px'}}>Organiser {org.n} · Deadline {g.deadline}<br/>{collectionName} · {outlet.n} · collect at {g.slot}<br/>{g.pay==='sponsor'?org.n+' is paying for everyone':'Everyone pays for their own order'}</div>
      {members.map(p=><div key={p.id} style={{padding:'5px 0',borderTop:'1px solid var(--line)'}}><b>{p.n}</b> <span className="mute">{p.sub?lines(p):waitText(p)}</span></div>)}
      <div className="row" style={{marginTop:8}}><span className="sp mute">{subm.length}/{members.length} submitted</span><b>{$(groupTotal)}</b></div></div>
     </>}
