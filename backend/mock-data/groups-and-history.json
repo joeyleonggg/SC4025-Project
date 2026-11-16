@@ -1,0 +1,188 @@
+{
+  "savedGroups": [
+    {
+      "name": "Marketing Team",
+      "members": [
+        "Mary Ng",
+        "Ben",
+        "Calvin",
+        "Dylan"
+      ]
+    },
+    {
+      "name": "Friday Breakfast Crew",
+      "members": [
+        "Mary Ng",
+        "Ben",
+        "Dylan",
+        "Eve"
+      ]
+    },
+    {
+      "name": "Project Team",
+      "members": [
+        "Mary Ng",
+        "Calvin",
+        "Eve"
+      ]
+    }
+  ],
+  "exampleHistory": [
+    {
+      "id": "YT0987",
+      "name": "Friday Breakfast Crew",
+      "at": 1789690800000,
+      "outlet": "Ya Kun – Far East Square",
+      "slot": "8:45 AM",
+      "coll": "C-017",
+      "status": "collected",
+      "pay": "individual",
+      "members": [
+        "Mary Ng",
+        "Ben",
+        "Dylan"
+      ],
+      "orders": {
+        "0": {
+          "items": [
+            {
+              "id": 1,
+              "name": "Kaya Toast Set",
+              "o": "Kopi O, less sweet",
+              "q": 1,
+              "p": 5.2
+            }
+          ],
+          "owed": 5.2,
+          "rw": "",
+          "earn": 52
+        },
+        "1": {
+          "items": [
+            {
+              "id": 2,
+              "name": "French Toast Set",
+              "o": "Teh",
+              "q": 1,
+              "p": 5.6
+            },
+            {
+              "id": 6,
+              "name": "Kopi",
+              "o": "Normal, hot",
+              "q": 1,
+              "p": 1.7
+            }
+          ],
+          "owed": 7.3,
+          "rw": "",
+          "earn": 73
+        },
+        "3": {
+          "items": [
+            {
+              "id": 1,
+              "name": "Kaya Toast Set",
+              "o": "Kopi",
+              "q": 1,
+              "p": 5.2
+            },
+            {
+              "id": 4,
+              "name": "Butter Kaya Toast",
+              "o": "As served",
+              "q": 1,
+              "p": 2.4
+            }
+          ],
+          "owed": 7.6,
+          "rw": "",
+          "earn": 76
+        }
+      },
+      "total": 20.1
+    },
+    {
+      "id": "YT0951",
+      "name": "Marketing Team",
+      "at": 1788827700000,
+      "outlet": "Ya Kun – NTU North Spine",
+      "slot": "9:00 AM",
+      "coll": "C-029",
+      "status": "collected",
+      "pay": "individual",
+      "members": [
+        "Mary Ng",
+        "Ben",
+        "Calvin",
+        "Dylan"
+      ],
+      "orders": {
+        "0": {
+          "items": [
+            {
+              "id": 2,
+              "name": "French Toast Set",
+              "o": "Teh",
+              "q": 1,
+              "p": 5.6
+            },
+            {
+              "id": 8,
+              "name": "Milo",
+              "o": "Normal, iced",
+              "q": 1,
+              "p": 3
+            }
+          ],
+          "owed": 8.6,
+          "rw": "",
+          "earn": 86
+        },
+        "1": {
+          "items": [
+            {
+              "id": 1,
+              "name": "Kaya Toast Set",
+              "o": "Kopi O",
+              "q": 1,
+              "p": 5.2
+            }
+          ],
+          "owed": 5.2,
+          "rw": "",
+          "earn": 52
+        },
+        "2": {
+          "items": [
+            {
+              "id": 3,
+              "name": "Peanut Butter Toast Set",
+              "o": "Teh O, kosong",
+              "q": 1,
+              "p": 5.2
+            }
+          ],
+          "owed": 5.2,
+          "rw": "",
+          "earn": 52
+        },
+        "3": {
+          "items": [
+            {
+              "id": 1,
+              "name": "Kaya Toast Set",
+              "o": "Kopi",
+              "q": 2,
+              "p": 5.2
+            }
+          ],
+          "owed": 10.4,
+          "rw": "",
+          "earn": 104
+        }
+      },
+      "total": 29.4
+    }
+  ]
+}

@@ -1,0 +1,204 @@
+{
+  "date": "2026-11-16",
+  "applicationCommit": "007798a",
+  "testedCommit": "1976fc2",
+  "format": "Captioned sequence of real application screen captures; no audio or continuous pointer recording.",
+  "scenes": [
+    {
+      "file": "01-home.jpg",
+      "title": "Organiser home",
+      "caption": "Mary Ng starts a team order. Each participant pays for their own items.",
+      "duration": 8,
+      "sha256": "78bf4481b962c5fb881eb352074f5f87cfffdcbe9c866167f75aa45983ec0049"
+    },
+    {
+      "file": "02-group-setup.jpg",
+      "title": "Group setup",
+      "caption": "Name the group and choose an expected capacity between two and ten.",
+      "duration": 8,
+      "sha256": "d11e98515526e4957aacd80b34c5236860b37023cdb895b4069176eff57ab169"
+    },
+    {
+      "file": "03-advance-collection.jpg",
+      "title": "Advance collection",
+      "caption": "Advance choices reserve at least two hours after the planned ordering deadline.",
+      "duration": 8,
+      "sha256": "0347cf15f2159adf880f3cbcef13f8ffbb847e552283193d5a895ec02daa78ed"
+    },
+    {
+      "file": "04-payment-rule.jpg",
+      "title": "Ordering time and payment",
+      "caption": "Thirty minutes to order. Every person confirms their own saved card; no charge happens yet.",
+      "duration": 8,
+      "sha256": "a7912740167a9b05d42eaccb88e6c12bab1fd255abe85eacc0ab3df5ce62474f"
+    },
+    {
+      "file": "05-pending-invitations.jpg",
+      "title": "Pending invitations",
+      "caption": "Ben and Calvin are invited, but the joined-member count remains one until they accept.",
+      "duration": 8,
+      "sha256": "82eccbd5e139fe35225261d4a1ac282c108446b1f36977a59eb40367ffd1fc7e"
+    },
+    {
+      "file": "06-joining-notice.jpg",
+      "title": "Joining notice and consent",
+      "caption": "Ben reads the disclosure. Marketing consent is separate and starts unticked; joining does not require it.",
+      "duration": 8,
+      "sha256": "934bff162e8bd7cf4038826082409d589284b27acbef5dac5baf5b9aa0453c38"
+    },
+    {
+      "file": "07-menu.jpg",
+      "title": "Menu and personal choices",
+      "caption": "The menu contains food pictures, categories, current prices and customisable set drinks.",
+      "duration": 8,
+      "sha256": "76950c9382670ac0741c845f286af47769a791f4d2430b9b6d05f2c86be10252"
+    },
+    {
+      "file": "08-customisation.jpg",
+      "title": "Customise an item",
+      "caption": "Choose the set drink, sweetness and quantity. Supplements are included in the total.",
+      "duration": 8,
+      "sha256": "1a76eb24d542fbb863c0f837dd5087950cf739ebb5d65008d3f2ef4881d2cbe9"
+    },
+    {
+      "file": "09-personal-reward.jpg",
+      "title": "Personal reward and points",
+      "caption": "Ben redeems 200 points for two dollars off: he pays $4.30 and estimates 37 advance points.",
+      "duration": 8,
+      "sha256": "84e3e59fbb346df471834a0f5d3a0242ce5a20521029b6c19b98ddc3b014e13e"
+    },
+    {
+      "file": "10-saved-cards.jpg",
+      "title": "Personal saved cards",
+      "caption": "Ben confirms his own card. Card selection does not charge it; charging waits for a successful send.",
+      "duration": 8,
+      "sha256": "64271ffea24a76bc2296da0f30c2978a7d6115c90266e6dc7ccb95ed80c9a724"
+    },
+    {
+      "file": "11-sweetness-choice.jpg",
+      "title": "Individual customisation",
+      "caption": "Mary selects less sweet without changing the default set price. Each person edits only their own cart.",
+      "duration": 8,
+      "sha256": "1841f128a1c306b45b5151ff74e351c8db8d1b427424978f2cb1d75a81866cbf"
+    },
+    {
+      "file": "12-organiser-status.jpg",
+      "title": "Organiser review",
+      "caption": "Mary reviews three submitted orders and personal payment readiness. The group total is $16.90.",
+      "duration": 8,
+      "sha256": "88dc1414de0af96846c79ddab353c68e08960878dbe432f3ef3bd9a2e30949b2"
+    },
+    {
+      "file": "13-payment-declined.jpg",
+      "title": "Decline blocks sending",
+      "caption": "Ben card is declined. The order stays unsent and nobody is charged; Mary sees status without his card details.",
+      "duration": 8,
+      "sha256": "6a207235972d0ae5dd5e220bc3051544ea52ac74dc4f9c3a96b129abdd52b70d"
+    },
+    {
+      "file": "14-participant-privacy.jpg",
+      "title": "Payment status privacy",
+      "caption": "Calvin sees his own payment readiness. Ben named failure and card details are absent from this view.",
+      "duration": 8,
+      "sha256": "12394cf33917526a8d15c65ca13eaa4b16263f1ee4586974ff7941dc73577c22"
+    },
+    {
+      "file": "15-alternative-card.jpg",
+      "title": "Recover with another card",
+      "caption": "Ben default card ending 2222 is unavailable for this order. He confirms the alternative ending 8018.",
+      "duration": 8,
+      "sha256": "521e3a2eafb68997ca0906cf4ae5c58c917833dddc3fe816b5ae27dade4c5ac1"
+    },
+    {
+      "file": "16-consolidated-order.jpg",
+      "title": "Consolidated outlet order",
+      "caption": "One outlet order combines three sets and preserves each selected drink and sweetness option.",
+      "duration": 8,
+      "sha256": "efe2a24dcd6ebfee8f2b26f06798a9aa715dddd81095ec021c7005702cb0902c"
+    },
+    {
+      "file": "17-who-gets-what.jpg",
+      "title": "Who gets what",
+      "caption": "The post-send breakdown lists the items belonging to Mary, Ben and Calvin.",
+      "duration": 8,
+      "sha256": "aa49406f39a5352a93f0936667823d4de89a5ccf132161a282712416d2daae43"
+    },
+    {
+      "file": "18-ready.jpg",
+      "title": "Ready notification and pending points",
+      "caption": "The outlet-ready notification appears. Points remain pending until Mary confirms collection.",
+      "duration": 8,
+      "sha256": "914c2ec04313e03bf6aaa3e199f69bc96af21f2d93bf38df266c0df29fee621a"
+    },
+    {
+      "file": "19-points-credited.jpg",
+      "title": "Personal points credited",
+      "caption": "Collection credits 55 points to Mary, 37 to Ben and 55 to Calvin, once only.",
+      "duration": 8,
+      "sha256": "54759a0b137ddc301f0432b17e94639afd5c4e18f49e01c293983f3ce5d333f3"
+    },
+    {
+      "file": "20-personal-receipt.jpg",
+      "title": "Correct personal receipt",
+      "caption": "Ben was charged $4.30 on his alternative card ending 8018, and received his own points.",
+      "duration": 8,
+      "sha256": "de3af0c53656098df7494c2319ac2f8bfc65011f6b98c74e104863d7580ac755"
+    },
+    {
+      "file": "21-history.jpg",
+      "title": "History preserves the award",
+      "caption": "History retains Ben payment, selected card, 10 percent bonus and 37-point award.",
+      "duration": 8,
+      "sha256": "c362d4ea4dc3f460eb9726b218c9c5d3f585a0e6a215eba0abf90333ad74ccb1"
+    },
+    {
+      "file": "22-consent-preference.jpg",
+      "title": "Review optional consent",
+      "caption": "Calvin previously chose marketing opt-in. His preference is separate from other accounts and from joining.",
+      "duration": 8,
+      "sha256": "58519d61279d7e8d55019136bb0eeb492928546f7d1327b3e880dfdc7d575ed0"
+    },
+    {
+      "file": "23-consent-withdrawn.jpg",
+      "title": "Withdraw optional consent",
+      "caption": "Calvin can withdraw his own preference. No marketing messages are actually sent by this demo.",
+      "duration": 8,
+      "sha256": "0142365e75048ec4ef919addd4107229d587413be7e125d59da6879517fd582e"
+    },
+    {
+      "file": "24-retention-policy.jpg",
+      "title": "Seven-day retention",
+      "caption": "Completed history and saved groups expire after seven inactive days. Leaving only clears related active data and membership.",
+      "duration": 8,
+      "sha256": "90853b105a261bffa3f8d9e0f9c06b55d8bb749087029b19e365f5c0e4549b60"
+    },
+    {
+      "file": "25-retention-result.jpg",
+      "title": "Scoped expiry demonstration",
+      "caption": "One inactive history example and one owned saved group expire. Other records and the recent completed group remain.",
+      "duration": 8,
+      "sha256": "445c0efce3c1e8caa9439a03426b2b3950fbdaad4d355ef6882433df8a874592"
+    },
+    {
+      "file": "26-saved-reuse.jpg",
+      "title": "Reuse a saved group",
+      "caption": "Mary reuses the saved team. Ben and Calvin receive invitations again; only Mary has joined so far.",
+      "duration": 8,
+      "sha256": "40e4c9b6536bebb020bd5967077d09e97bfcf44efbd64cb304cda4e4cfead22e"
+    },
+    {
+      "file": "27-consent-default.jpg",
+      "title": "New invitation, optional consent",
+      "caption": "A reused group requires joining again. Ben optional marketing checkbox starts unticked.",
+      "duration": 8,
+      "sha256": "8662743e8630618bdb9b3d0ce0ad31239a40a422ef53ea577c18967036c58439"
+    }
+  ],
+  "recapturedScreens": [
+    "08-customisation.jpg",
+    "11-sweetness-choice.jpg",
+    "21-history.jpg",
+    "27-consent-default.jpg"
+  ],
+  "note": "Modal screens were recaptured after their opening animation settled. The video is a captioned sequence, not a continuous screen recording."
+}

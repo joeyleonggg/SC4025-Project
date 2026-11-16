@@ -1,0 +1,182 @@
+[
+  {
+    "name": "Mary Ng",
+    "email": "maryng@yakun.demo",
+    "role": "organiser",
+    "startingPoints": 340,
+    "cards": [
+      {
+        "id": "card",
+        "last4": "1111",
+        "label": "Default saved card"
+      },
+      {
+        "id": "backup",
+        "last4": "8008",
+        "label": "Alternative saved card"
+      }
+    ]
+  },
+  {
+    "name": "Ben",
+    "email": "ben@yakun.demo",
+    "role": "participant",
+    "startingPoints": 260,
+    "cards": [
+      {
+        "id": "card",
+        "last4": "2222",
+        "label": "Default saved card"
+      },
+      {
+        "id": "backup",
+        "last4": "8018",
+        "label": "Alternative saved card"
+      }
+    ]
+  },
+  {
+    "name": "Calvin",
+    "email": "calvin@yakun.demo",
+    "role": "participant",
+    "startingPoints": 90,
+    "cards": [
+      {
+        "id": "card",
+        "last4": "3333",
+        "label": "Default saved card"
+      },
+      {
+        "id": "backup",
+        "last4": "8028",
+        "label": "Alternative saved card"
+      }
+    ]
+  },
+  {
+    "name": "Dylan",
+    "email": "dylan@yakun.demo",
+    "role": "participant",
+    "startingPoints": 520,
+    "cards": [
+      {
+        "id": "card",
+        "last4": "4444",
+        "label": "Default saved card"
+      },
+      {
+        "id": "backup",
+        "last4": "8038",
+        "label": "Alternative saved card"
+      }
+    ]
+  },
+  {
+    "name": "Eve",
+    "email": "eve@yakun.demo",
+    "role": "participant",
+    "startingPoints": 150,
+    "cards": [
+      {
+        "id": "card",
+        "last4": "5555",
+        "label": "Default saved card"
+      },
+      {
+        "id": "backup",
+        "last4": "8048",
+        "label": "Alternative saved card"
+      }
+    ]
+  },
+  {
+    "name": "Farah",
+    "email": "farah@yakun.demo",
+    "role": "participant",
+    "startingPoints": 410,
+    "cards": [
+      {
+        "id": "card",
+        "last4": "6666",
+        "label": "Default saved card"
+      },
+      {
+        "id": "backup",
+        "last4": "8058",
+        "label": "Alternative saved card"
+      }
+    ]
+  },
+  {
+    "name": "Gareth",
+    "email": "gareth@yakun.demo",
+    "role": "participant",
+    "startingPoints": 75,
+    "cards": [
+      {
+        "id": "card",
+        "last4": "7777",
+        "label": "Default saved card"
+      },
+      {
+        "id": "backup",
+        "last4": "8068",
+        "label": "Alternative saved card"
+      }
+    ]
+  },
+  {
+    "name": "Hui Min",
+    "email": "huimin@yakun.demo",
+    "role": "participant",
+    "startingPoints": 230,
+    "cards": [
+      {
+        "id": "card",
+        "last4": "8888",
+        "label": "Default saved card"
+      },
+      {
+        "id": "backup",
+        "last4": "8078",
+        "label": "Alternative saved card"
+      }
+    ]
+  },
+  {
+    "name": "Irfan",
+    "email": "irfan@yakun.demo",
+    "role": "participant",
+    "startingPoints": 600,
+    "cards": [
+      {
+        "id": "card",
+        "last4": "9999",
+        "label": "Default saved card"
+      },
+      {
+        "id": "backup",
+        "last4": "8088",
+        "label": "Alternative saved card"
+      }
+    ]
+  },
+  {
+    "name": "Jia Wei",
+    "email": "jiawei@yakun.demo",
+    "role": "participant",
+    "startingPoints": 180,
+    "cards": [
+      {
+        "id": "card",
+        "last4": "1212",
+        "label": "Default saved card"
+      },
+      {
+        "id": "backup",
+        "last4": "8098",
+        "label": "Alternative saved card"
+      }
+    ]
+  }
+]
