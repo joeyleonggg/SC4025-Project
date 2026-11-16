@@ -163,10 +163,11 @@ function App(){
  const meth=mName(me.pmeth||'card',uid);
  // Order history: the current group appears as soon as it is sent (so it is never lost), older ones are archived below it.
  const snapshot=()=>({s:1,id:g.gid,name:g.name,at:g.sentAt||Date.now(),outlet:outlet.n,slot:g.slot,coll:g.coll,status:g.status||'preparing',pay:g.pay,total:groupTotal,
+  payer:g.pay==='sponsor'?{id:org.id,amount:org.paidAmt,method:org.paidMeth,earn:g.status==='collected'?org.earned:pts10(groupTotal)}:null,
   members:subm.map(p=>p.n),
   orders:Object.fromEntries(subm.map(p=>[p.id,{items:p.items.map(i=>({...i})),owed:owed(p),rw:rw(p)?rw(p).t:'',free:freeOf(p)?freeOf(p).free:'',earn:g.status==='collected'?p.earned:earnOf(p)}]))});
  const histAll=[...(g.live&&g.sent&&!g.cancelled?[snapshot()]:[]),...hist];
- const myHist=histAll.filter(h=>h.orders[uid]||(uid===0&&h.members.includes(USERS0[0].n)));
+ const myHist=histAll.filter(h=>h.orders[uid]||(uid===0&&(h.pay==='sponsor'||h.members.includes(USERS0[0].n))));
 
  const say=(t)=>{clearTimeout(toastT.current);setToast({t,mid:true});toastT.current=setTimeout(()=>setToast(''),TOAST_MS)};
  const login=()=>{
@@ -313,13 +314,14 @@ function App(){
   const methOf=x=>x.org&&meth?meth:(x.pmeth||'card');
   setG(x=>({...x,sent:true,sentAt:at,status:'preparing'}));
   setP(p=>p.map(x=>{
-   if(!(x.in&&x.sub))return x;
-   const order=submitted(x), r=rw(order), amt=amtOf(order);
+   if(!x.in||!(x.sub||(sponsor&&x.org)))return x;
+   const order=submitted(x), r=x.sub&&rw(order), amt=amtOf(order);
    const base={...x,paid:1,paidAmt:amt,paidMeth:amt>0?mName(methOf(x),x.id):'',pmeth:x.pmeth||(amt>0?methOf(x):null)};
    return r?{...base,pts:x.pts-r.cost,hist:[{amt:-r.cost,note:r.t+' reward',at}, ...x.hist]}:base;
   }));
   note('Group order submitted. Collect at '+g.slot+', '+outlet.n,'receipt');
-  subm.forEach(x=>{const amt=amtOf(x);note(amt>0?'You were charged '+$(amt)+' ('+mName(methOf(x),x.id)+') for '+g.name:sponsor?org.n+' paid for your order.':'Nothing was charged: your order was fully covered.','card',[x.id])});
+  const recipients=sponsor?members.filter(x=>x.sub||x.org):subm;
+  recipients.forEach(x=>{const amt=amtOf(x);note(amt>0?'You were charged '+$(amt)+' ('+mName(methOf(x),x.id)+') for '+g.name:sponsor&&!x.org?org.n+' paid for your order.':'Nothing was charged: your order was fully covered.','card',[x.id])});
  };
  // Organiser taps "Send": if a charge would be declined (demo switch), the order is NOT sent and that person is asked for another method.
  const trySend=meth=>{
@@ -681,14 +683,18 @@ function App(){
     {!slotAvailable(g.slot,Date.now())&&<Ban c="e"><span style={{display:'block',marginTop:14}}>Pick an available future time that fits {g.size} people.</span></Ban>}
     {!g.slotTimes.some(t=>timeOfSlot(t)>Math.max(Date.now(),g.deadlineAt))&&<button className="btn ghost sm" onClick={()=>setG(x=>({...x,...slotSet(),slot:'',slotGone:false}))}>Show new pickup times</button>}
     <button className="btn" style={{marginTop:22}} onClick={()=>setSheet(null)}>Done</button></>}
-   {sheet.k==='hist'&&(()=>{const h=sheet.h,m=h.orders[uid];return <><b style={{fontSize:18}}>{h.name}</b>
+   {sheet.k==='hist'&&(()=>{const h=sheet.h,m=h.orders[uid],sponsor=h.pay==='sponsor',payer=sponsor&&isOrg;return <><b style={{fontSize:18}}>{h.name}</b>
     <div className="mute">#{h.id} · {fdt(h.at)}</div>
     <div className="mute">{h.outlet} · pickup {h.slot}{h.coll?' · collection '+h.coll:''}</div>
     <div className="mute">{STAT[h.status]} · {h.pay==='sponsor'?'Organiser paid for everyone':'Everyone paid for their own order'}</div>
     <div className="h3">Your order</div>
     {m?<>{m.items.map((i,k)=><div className="row" key={k} style={{padding:'4px 0'}}><span className="sp">{i.name}{optTxt(i.o)&&<div className="mute">{optTxt(i.o)}</div>}{i.q>1&&<div className="mute">× {i.q}</div>}</span>{$(i.p*i.q)}</div>)}{m.free&&<div className="row" style={{padding:'4px 0'}}><span className="sp">{m.free}<div className="mute">Free reward</div></span>{$(0)}</div>}
-     <div className="row" style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--line)'}}><b className="sp">{h.pay==='sponsor'&&!isOrg?'Paid by '+USERS0[0].n:'You paid'}</b><b>{h.pay==='sponsor'&&!isOrg?$(0):$(m.owed)}</b></div>
-     <div className="mute" style={{marginTop:4}}>{h.pay==='sponsor'&&!isOrg?USERS0[0].n+' earned the points for this order':m.earn+' Cherish points earned'}</div></>:<div className="mute">You didn't submit an order in this group.</div>}
+    </>:<div className="mute">You didn't submit an order in this group.</div>}
+    {(m||payer)&&<>
+     <div className="row" style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--line)'}}><b className="sp">{sponsor&&!isOrg?'Paid by '+USERS0[0].n:'You paid'}</b><b>{$(payer?(h.payer?.amount??h.total):sponsor?0:m.owed)}</b></div>
+     {payer&&h.payer?.method&&<div className="mute">{h.payer.method}</div>}
+     <div className="mute" style={{marginTop:4}}>{sponsor&&!isOrg?USERS0[0].n+' earned the points for this order':(payer?(h.payer?.earn??pts10(h.total)):m.earn)+' Cherish points earned'}</div>
+    </>}
     <div className="h3">Who got what</div><div className="card">{Object.entries(h.orders).map(([k,o])=><div key={k} style={{padding:'6px 0'}}><b>{USERS0[k].n}{+k===uid?' (you)':''}</b>{o.items.map((i,x)=><div className="mute" key={x}>{itemLine(i)}</div>)}{o.free&&<div className="mute">Free {o.free} (reward)</div>}</div>)}{isOrg&&<div className="row" style={{marginTop:6}}><span className="sp mute">Group total</span><b>{$(h.total)}</b></div>}</div>
     {m&&<button className="btn" style={{marginTop:14}} onClick={()=>reorder(h)}>Reorder with changes</button>}</>})()}
    {sheet.k==='invite'&&<><div className="row"><Icon n="check" s={26}/><b style={{fontSize:18}}>Invite link copied</b></div>
