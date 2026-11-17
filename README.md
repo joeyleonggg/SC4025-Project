@@ -89,11 +89,13 @@ The controlled-clock checks cover multi-hour timing, reminders and seven-day exp
 
 ## Report and repository references
 
-### Section 5.1 System architecture
+### System architecture
 
 The [dedicated architecture folder](docs/architecture/README.md) explains the implemented components, state transitions and service boundaries. Its [diagram](docs/architecture/architecture.svg) is available for the report. The browser holds application state. The Vite server serves the frontend rather than processing orders. The backend folder contains reference fixtures and documentation, with no running backend API.
 
-### Section 5.2 Technology stack
+![Ya Kun Together implemented system architecture](docs/architecture/architecture.svg)
+
+### Technology stack
 
 Versions below are recorded in frontend/package-lock.json. They describe this MVP rather than a proposed production deployment.
 
@@ -108,6 +110,10 @@ Versions below are recorded in frontend/package-lock.json. They describe this MV
 | JSON reference snapshots | backend/mock-data | Exported examples generated from the frontend fixtures |
 
 There is no additional UI framework, database, backend API or real payment integration in the current app. [Backend documentation](backend/README.md) explains this boundary, and the demo account table above supplies the presentation logins.
+
+React provides reusable components and state-driven updates for the organiser and participant views. Vite supplies local development and production builds. Plain CSS controls the phone-style layout, while local fixtures make the presentation reproducible without external services. The built-in Node.js test runner checks the order rules and timing boundaries without requiring a live payment provider or outlet.
+
+The main implementation files are [main.jsx](frontend/src/main.jsx) for application startup, [App.jsx](frontend/src/App.jsx) for screens and order logic, [data.js](frontend/src/data.js) for fixtures, [retention.js](frontend/src/retention.js) for expiry helpers and [styles.css](frontend/src/styles.css) for presentation. [package.json](frontend/package.json) declares dependencies and commands, and [package-lock.json](frontend/package-lock.json) records the resolved versions.
 
 ### Report assets
 
