@@ -1,8 +1,8 @@
-# Improvement 10 — Automatic order and payment reminders
+# Automatic order and payment reminders
 
 ## Requirement and timing
 
-A11 implements Section 3.5.3, FR-02 and FR-09. The existing two-minute warning window now targets each joined person's outstanding action.
+Reminders support FR-02 and FR-09. The two-minute warning window targets each joined person's outstanding action.
 
 | Current personal state | Automatic reminder |
 | --- | --- |
@@ -11,7 +11,7 @@ A11 implements Section 3.5.3, FR-02 and FR-09. The existing two-minute warning w
 | Submitted with a ready card | None |
 | Submitted with nothing to pay | None |
 | Invited but not joined, left or removed | None |
-| Payment declined | Existing dedicated decline/recovery notice; no redundant automatic payment reminder |
+| Payment declined | Existing dedicated decline/recovery notice. No redundant automatic payment reminder |
 
 Automatic messages are personal in-app notifications while the demo remains open. They do not identify another person's payment problem or expose card details to the group.
 
@@ -20,10 +20,10 @@ Automatic messages are personal in-app notifications while the demo remains open
 - Reminders run when two minutes remain. A person joining or submitting during that window is checked immediately for the action they still need to complete.
 - Closing ordering early immediately reminds submitted participants still missing payment methods. It does not ask non-submitters to submit after closure.
 - Payment reminders can still be delivered after ordering closes, since confirming a card remains possible until sending.
-- Each person receives at most one automatic reminder of each kind per group and deadline. A late submitter can receive an order reminder first and a payment reminder after submission; those request different actions.
+- Each person receives at most one automatic reminder of each kind per group and deadline. A late submitter can receive an order reminder first and a payment reminder after submission. Those request different actions.
 - Confirming a card stops further automatic payment reminders. Ready accounts and zero-pay orders do not need one.
 - Switching demo viewers does not repeat delivery or change recipients.
-- An approved extension creates a fresh deadline window with its own reminder allowance. Old reminder and closure timers cannot act on the extended deadline.
+- A deadline extension creates a fresh deadline window with its own reminder allowance. Old reminder and closure timers cannot act on the extended deadline.
 - Cancelling, sending or replacing the group stops its scheduled reminder and closure actions. Callbacks also check current state, so an already queued old callback cannot affect the replacement group.
 - The deadline popup is shown only to Mary when she is the current signed-in viewer. Participants and the logged-out screen do not receive Mary's popup.
 - Manual reminders remain available to Mary and continue to target the selected person. They are explicit actions and separate from automatic deduplication.
@@ -59,6 +59,6 @@ The tests advance a controlled clock, so the complete reminder timing can be rer
 4. Keep the demo open until the countdown reaches two minutes. Ben's notifications should ask him to confirm a payment method. Dylan's should ask him to submit. Mary and Calvin should receive neither automatic action reminder.
 5. Switch accounts and inspect notifications. Each person should see only their own reminder, with no duplicates from switching.
 6. Confirm Ben's card and submit Dylan's order. Confirm a card as Dylan. Further screen changes should not repeat their automatic reminders for this deadline.
-7. In a fresh group, close ordering early while Ben has submitted but has not confirmed a card. He should get a payment reminder immediately; a non-submitter should not be asked to submit after closure.
+7. In a fresh group, close ordering early while Ben has submitted but has not confirmed a card. He should get a payment reminder immediately. A non-submitter should not be asked to submit after closure.
 8. Use Mary's manual Remind control and confirm only the selected person gets it. Automatic reminder deduplication should not suppress that deliberate manual action.
 9. Use the automated checks above for extension, stale-timer and cancellation/sending cases without a long presentation wait.

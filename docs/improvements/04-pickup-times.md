@@ -1,8 +1,8 @@
-# Improvement 04 — Pickup and advance-order collection
+# Pickup and advance-order collection
 
 ## Current requirement
 
-A05 implements FR-07, US-01 and US-09 from the latest report while retaining the agreed quick pickup choices and later-time dropdown.
+This document explains the pickup and advance-order collection modes associated with FR-07, US-01 and US-09.
 
 ## Collection choices
 
@@ -15,11 +15,11 @@ A05 implements FR-07, US-01 and US-09 from the latest report while retaining the
 
 ## Timing interpretation and validation
 
-The outlet receives an order when the organiser sends it. Ordinary pickup therefore requires at least 15 minutes from sending, and advance ordering normally requires at least two hours. This is the agreed interpretation of the report's selection-versus-placement wording; it is recorded for the group discussion.
+The outlet receives an order when the organiser sends it. Ordinary pickup therefore requires at least 15 minutes from sending, and advance ordering normally requires at least two hours.
 
 Creation and replacement choices anticipate sending at the later of the current time and the ordering deadline. Creation checks again after the organiser chooses the ordering window. Sending rechecks the current lead time and capacity, as well as the existing stock and payment checks. A stale time or a full slot requires a valid replacement.
 
-For advance orders, creation saves the qualification time, original planned deadline and collection timestamp. A replacement validates and records fresh qualification. Switching to pickup clears those fields. A06 now uses these records to preserve the original advance qualification during the one approved 15-minute extension. See [the extension rules](05-deadline-extension.md). Qualifying advance orders now receive the [A07 10% points bonus](06-advance-points.md).
+For advance orders, creation saves the qualification time, original planned deadline and collection timestamp. A replacement validates and records fresh qualification. Switching to pickup clears those fields. These records preserve the original advance qualification during the one available 15-minute extension. See [the extension rules](05-deadline-extension.md). Qualifying advance orders receive the [10% points bonus](06-advance-points.md).
 
 Only the organiser can change collection choices before sending. Sent and cancelled groups cannot change mode or time. Existing history retains its original values.
 

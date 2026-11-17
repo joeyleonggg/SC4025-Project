@@ -1,8 +1,8 @@
-# Improvement 03 — Menu catalogue, prices and pictures
+# Menu catalogue, prices and pictures
 
 ## Requirement
 
-Update the existing items and add the food, drinks and merchandise shown in the 20 supplied menu screenshots. Use the supplied recording for set-meal drink options. The user authorised reasonable estimates for obscured prices.
+The menu includes food, drinks and merchandise from 20 reference screenshots. Set-meal drink options follow the reference catalogue and recording. Obscured prices and some supplements use the estimates listed below.
 
 ## Delivered behaviour
 
