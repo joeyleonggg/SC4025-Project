@@ -1,17 +1,17 @@
-# Improvement 09 — Named invitations and joining
+# Named invitations and joining
 
-## Requirement and agreed demo interaction
+## Invitation flow
 
-A10 implements FR-01, FR-10, FR-11 and US-02/US-12. Yi Xiang confirmed named invitations with participant joining on 16 November 2026: Mary invites an account, then the presenter switches to that person, opens the invitation and chooses **Join group**.
+The invitation flow supports FR-01, FR-10, FR-11 and US-02/US-12. Mary invites a named account. The invited participant opens the invitation and chooses **Join group**. Demo controls switch between account views within the same tab.
 
 An invitation and a joined member are separate states. Inviting Ben does not add him to the member count or submit anything for him.
 
 ## Access and membership
 
-- Mary opens **Group → Invite people** and selects **Invite** next to a named account. That account receives its invitation notification; unrelated accounts do not gain access.
+- Mary opens **Group → Invite people** and selects **Invite** next to a named account. That account receives its invitation notification. Unrelated accounts do not gain access.
 - The invited person signs in, or is selected through the top-right demo user switcher, then opens the invitation from Home or **Order → View invitation** and selects **Join group**.
 - Joining checks the current invitation, account, ordering deadline, group state and remaining capacity again. An earlier open invitation screen cannot bypass a group becoming full or closing.
-- Invitations do not reserve places. Joined membership determines whether the group is full; the organiser's expected size still determines collection-slot capacity.
+- Invitations do not reserve places. Joined membership determines whether the group is full. The organiser's expected size still determines collection-slot capacity.
 - Saved groups invite only their listed demo members. They no longer automatically join those accounts. Each person accepts their own invitation.
 - Leaving clears the person's order and selected payment method, but retains their invitation. They can rejoin while ordering is open and there is room.
 - Removing a member clears their order and revokes their invitation. They need a new named invitation from Mary before rejoining.
@@ -23,7 +23,7 @@ An invitation and a joined member are separate states. Inviting Ben does not add
 
 The invitation link uses the current app's address with `#invite=` and the group's key, replacing the placeholder Ya Kun address. Opening that hash in the **same running demo tab** opens the invitation, and the request is retained through sign-in.
 
-The app keeps order state in memory. A new tab, refresh or another device has no shared group data. Those links explain this limitation rather than pretending the group is available. Cross-tab or cross-device sharing would require shared state and remains outside this agreed mock flow.
+The app keeps order state in memory. A new tab, refresh or another device has no shared group data. Those links explain this limitation rather than pretending the group is available. Cross-tab or cross-device sharing would require shared state and remains outside this single-tab prototype.
 
 **Copy link** reports success only after the clipboard confirms the write. If access is missing or denied, the app shows a read-only invitation-link field and asks for manual copying. Possession of a link alone does not invite an unrelated account.
 
@@ -59,6 +59,6 @@ npm run build
 6. As Ben, leave and rejoin while ordering is open. Remove him as Mary and confirm he cannot rejoin until Mary invites him again.
 7. Use Mary's invitation simulation controls to check full and expired states. Closing ordering, cancelling and sending should also prevent a new participant joining and explain why.
 8. Create from **Project Team**. Confirm only Calvin and Eve receive pending invitations, and neither joins automatically.
-9. Copy the invitation link. It should point to this app. Open it in the same running tab to view the current invitation; a new tab should explain that the mock group is unavailable there.
+9. Copy the invitation link. It should point to this app. Open it in the same running tab to view the current invitation. A new tab should explain that the mock group is unavailable there.
 
-Joining disclosure and optional marketing consent remain A12.
+See [joining disclosure and optional marketing consent](11-joining-consent.md).

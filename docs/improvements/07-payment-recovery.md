@@ -1,8 +1,8 @@
-# Improvement 07 — Saved mock cards and decline recovery
+# Saved mock cards and decline recovery
 
 ## Requirement
 
-A08 implements FR-05 and US-06–US-07. Every demo account has two saved mock cards. Each person chooses their own card, and the group remains unsent until all required payment methods are ready.
+This feature supports FR-05 and US-06–US-07. Every demo account has two saved mock cards. Each person chooses their own card, and the group remains unsent until all required payment methods are ready.
 
 ## Demo cards
 
@@ -12,7 +12,7 @@ A08 implements FR-05 and US-06–US-07. Every demo account has two saved mock ca
 | Ben | 2222 | 8018 |
 | Calvin | 3333 | 8028 |
 
-The remaining demo accounts also have two cards. These are mock identifiers; no real card details or transactions are used.
+The remaining demo accounts also have two cards. These are mock identifiers. No real card details or transactions are used.
 
 ## Behaviour
 
@@ -23,9 +23,9 @@ The remaining demo accounts also have two cards. These are mock identifiers; no 
 - The successful send records each person's own payment amount and selected card. A repeated send action cannot duplicate the charges, notifications or reward redemption.
 - The personal Pay receipt and new history details show the actual selected card, including after another group is started.
 - A new group resets its card selection and declined-card flags. Existing receipt data stays recorded.
-- If both saved mock cards are deliberately declined, sending remains blocked. The demo explains that it must be reset to try again; it does not silently reuse a declined card.
+- If both saved mock cards are deliberately declined, sending remains blocked. The demo explains that it must be reset to try again. It does not silently reuse a declined card.
 
-A09 now limits payment status and failure messages to their intended viewers. See [payment status privacy](08-payment-privacy.md) for the visibility rules and checks.
+Payment status and failure messages are limited to their intended viewers. See [payment status privacy](08-payment-privacy.md) for the visibility rules and checks.
 
 ## Verification
 
@@ -55,6 +55,6 @@ npm run build
 5. As Ben, open **Pay**, then **Choose payment method**. Card 2222 should be unavailable. Select card 8018 and confirm it.
 6. Reopen the chooser and confirm 8018 remains selected. Return to Mary and retry sending from Status.
 7. Each person's Pay screen should show their own $6.30 payment, with Ben charged on 8018. Mary should not be charged the full group total.
-8. Collect the order, inspect Ben's history and confirm the payment amount and card. Start another group as Mary; its selections and decline flags should start fresh.
+8. Collect the order, inspect Ben's history and confirm the payment amount and card. Start another group as Mary. Its selections and decline flags should start fresh.
 
 For the automated two-item Ben scenario, his personal total is $12.60 rather than $6.30.

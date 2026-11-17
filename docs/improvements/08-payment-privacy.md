@@ -1,8 +1,8 @@
-# Improvement 08 — Payment status privacy
+# Payment status privacy
 
 ## Requirement
 
-A09 aligns the demo with FR-05, FR-11 and Section 5.5: payment status is visible to the organiser and the affected participant; personal saved cards, card-specific errors and receipts belong to that participant.
+For FR-05, FR-11 and the payment privacy scope, payment status is visible to the organiser and the affected participant. Personal saved cards, card-specific errors and receipts belong to that participant.
 
 ## Visibility
 
@@ -20,7 +20,7 @@ Group membership, collection details and ordinary group progress remain visible 
 ## Changes
 
 - The Status screen's named decline banners are organiser-only. Payment-status rendering also checks whether the viewer is the organiser or the person concerned.
-- Existing targeted notifications retain their intended audience: the affected participant receives the card-specific decline; Mary receives the status summary without card details. Recovery goes to Mary and charge notifications go to each payer separately.
+- Existing targeted notifications retain their intended audience: the affected participant receives the card-specific decline. Mary receives the status summary without card details. Recovery goes to Mary and charge notifications go to each payer separately.
 - Brief messages belong to the account that triggered them. Switching demo users clears those messages and temporary payment errors, selections and receipts.
 - Participants' demo decline controls show only their own account. Mary can simulate any group member's decline. The bulk **Others submit their orders** control is organiser-only because its summary can mention another person's payment readiness.
 - Personal Pay screens and historical receipt cards remain limited to the current person's details, including after successful recovery.

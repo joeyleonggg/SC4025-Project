@@ -1,8 +1,8 @@
-# Improvement 05 — One deadline extension and advance qualification
+# One deadline extension and advance qualification
 
-## Requirement and decisions
+## Extension rule
 
-A06 implements US-05 and Yi Xiang's approved advance-order exception. Each group can receive **one** extension of exactly 15 minutes. This limit was confirmed on 16 November 2026 and replaces the previously open question about repeated extensions.
+Each group can receive **one** extension of exactly 15 minutes. For an originally qualifying advance order, sending during that extension preserves its advance classification for the same collection slot.
 
 The selected collection time stays unchanged. The app blocks an extension if the full 15 minutes would reach or pass collection, rather than silently shortening it. Mary can select a later collection time first if the extension has not yet been used.
 
@@ -10,18 +10,18 @@ The selected collection time stays unchanged. The app blocks an extension if the
 
 - Only the organiser can extend a live, unsent, uncancelled group.
 - The new deadline is 15 minutes after the later of the existing deadline and the current time. An expired group can therefore receive the full additional period.
-- Extension reopens ordering, resets its reminder and notifies group members. It does not send automatically; the organiser still closes ordering and sends.
+- Extension reopens ordering, resets its reminder and notifies group members. It does not send automatically. The organiser still closes ordering and sends.
 - The extension control is disabled after use. A new group starts with its own unused extension allowance.
 - If the selected advance slot originally qualified for two hours after its planned deadline, that qualification remains valid for sending during the extension, including its endpoint. Passing the two-hour boundary alone does not block sending.
-- The exception ends when the extended period ends. Normal lead-time rules apply after that; a qualifying later replacement may be required.
+- The exception ends when the extended period ends. Normal lead-time rules apply after that. A qualifying later replacement may be required.
 - A changed collection time or mode cannot inherit the old exception. A new advance time must freshly satisfy the two-hour rule, and changing it does not restore the used extension allowance.
 - Capacity, unavailable items, payment readiness and cancellation checks remain in effect. The exception does not permit sending after collection.
 - Ordinary pickup retains its 15-minute preparation minimum.
-- History records extension use and the retained original qualification. A07 now implements the [10% advance bonus](06-advance-points.md) using that retained qualification.
+- History records extension use and the retained original qualification. The [10% advance bonus](06-advance-points.md) uses that retained qualification.
 
-## Example for group discussion
+## Timing example
 
-Noon collection originally has a 9:50am ordering deadline. Mary extends it to 10:05am. Sending at 10:04am remains an advance order for the same noon collection, although only 1 hour 56 minutes remains. The report should explicitly state this agreed exception to its ordinary two-hour placement rule.
+Noon collection originally has a 9:50am ordering deadline. Mary extends it to 10:05am. Sending at 10:04am remains an advance order for the same noon collection, although only 1 hour 56 minutes remains. This exception applies only during the extended deadline for the same collection slot.
 
 ## Verification
 

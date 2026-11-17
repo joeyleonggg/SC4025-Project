@@ -1,8 +1,8 @@
-# Decision 01 — Individual payments for new group orders
+# Individual payments for group orders
 
 ## Current requirement
 
-The latest report, FR-05, Table 4.3 and Section 4.4, limits the MVP to individual payments. This supersedes the earlier chat decision to retain organiser sponsorship.
+New group orders use individual payments. Each participant pays for their own submitted items, as described by FR-05.
 
 ## Behaviour
 
@@ -13,18 +13,18 @@ The latest report, FR-05, Table 4.3 and Section 4.4, limits the MVP to individua
 - The organiser sends the consolidated order without paying the other participants' totals.
 - Historical sponsored receipts retain their original payer and amounts. Compatibility code for those records remains in the app.
 
-Points calculation changes are tracked separately under A04 and A07; the current group-size multiplier is not changed by this payment update.
+Points are based on personal payment rather than group size. See the [baseline points calculation](02-group-points.md) and [advance-order bonus](06-advance-points.md).
 
 ## Verification
 
-A production build passed. Targeted checks of the actual React interaction handlers passed for creation (including stale sponsorship state), individual card selection with no immediate charge, three personal $6.30 charges on sending, current history and legacy sponsored receipt display. See the report-alignment backlog for delivery status.
+A production build passed. Targeted checks of the actual React interaction handlers passed for creation (including stale sponsorship state), individual card selection with no immediate charge, three personal $6.30 charges on sending, current history and legacy sponsored receipt display. See [functional verification](../acceptance/report-alignment.md) for the overall coverage.
 
 ## Manual acceptance steps
 
 1. Refresh and sign in as `maryng@yakun.demo`, password `kaya1234`.
 2. Create a group with a pickup time late enough for the ordering window. On **Ordering time and payment**, confirm the individual-payment explanation appears and there is no **I will pay for everyone** choice.
 3. Invite Ben and Calvin through **View group**, then switch to each account and choose **Join group**.
-4. Submit one default Set A at $6.30 as each of Mary, Ben and Calvin. Confirm each person's own saved card; no charge should appear yet.
+4. Submit one default Set A at $6.30 as each of Mary, Ben and Calvin. Confirm each person's own saved card. No charge should appear yet.
 5. As Mary, close ordering and send the group order. The group total is $18.90, but each person's **Pay** screen should show a $6.30 payment on their own card (1111, 2222 and 3333 respectively).
 6. Mark the order collected and open each person's order history. Confirm **Everyone paid for their own order** and **You paid $6.30**.
 7. Start another order from a saved group and confirm the same fixed individual-payment explanation.
