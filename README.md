@@ -2,7 +2,24 @@
 
 A React/Vite presentation MVP for group ordering. Mary Ng organises the group. Participants choose their own food, confirm their own mock cards and earn personal Cherish points after collection.
 
+The [documentation index](docs/README.md) provides links to architecture, implemented features, testing and report screenshots.
+
+## Prerequisites
+
+- Git to clone the repository.
+- Node.js and npm to install dependencies and run the app.
+- A web browser to view the prototype.
+
+The production build, collection tests and mock-data checks have been verified with Node.js **24.22.1**. The direct Node commands below are available when dependencies are already installed. npm is required for the standard dependency installation step.
+
 ## Start the app
+
+For a fresh copy:
+
+```sh
+git clone https://github.com/joeyleonggg/SC4025-Project.git
+cd SC4025-Project
+```
 
 From the repository folder:
 
@@ -86,6 +103,34 @@ node scripts/export-mock-data.mjs --check
 ```
 
 The controlled-clock checks cover multi-hour timing, reminders and seven-day expiry without real waits. See [functional verification](docs/acceptance/report-alignment.md) for coverage, implementation rules and prototype limitations.
+
+## Repository layout
+
+```text
+SC4025-Project/
+├── README.md                 Project overview, setup and demo accounts
+├── frontend/
+│   ├── src/                  React screens, state, fixtures and styles
+│   ├── public/menu/          Menu pictures used by the app
+│   ├── tests/                Collection flow and controlled-clock tests
+│   ├── scripts/              Mock-data export and consistency checks
+│   ├── package.json          Dependencies and application commands
+│   └── package-lock.json     Recorded dependency versions
+├── backend/
+│   ├── README.md             Scope of the simulated backend
+│   └── mock-data/            Generated reference snapshots
+├── docs/
+│   ├── README.md             Documentation index
+│   ├── architecture/         Architecture explanation and diagram
+│   ├── acceptance/           Verification evidence and behaviour rules
+│   ├── improvements/         Implemented feature details and checks
+│   ├── report/               Screenshot catalogue and report assets
+│   └── testing-guide.md      Manual demonstration and recovery tests
+├── scripts/                  Repository documentation link checker
+└── .gitignore                Dependency, build and environment exclusions
+```
+
+Application source and tests are in frontend. The backend folder contains reference data and documentation, with no separate service to start. The [documentation index](docs/README.md) explains where to find each supporting reference.
 
 ## Report and repository references
 
